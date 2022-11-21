@@ -77,37 +77,37 @@ class TriageNurses(Agent):
 			self.patients_triaging.append((patient, self.model.current_tick))
 		return
 
-	class Doctor(Agent):
-		def __init__(self, unique_id, model, n_doctors):
-			super().__init__(unique_id, model, n_doctors)
-			self.backlog = []
-			self.n_busy = 0
-			self.current_patients = []
+class Doctor(Agent):
+	def __init__(self, unique_id, model, n_doctors):
+		super().__init__(unique_id, model, n_doctors)
+		self.backlog = []
+		self.n_busy = 0
+		self.current_patients = []
 
-		def get_patient(self):
-			if self.model.triage_nurses.high_priority and self.n_busy < self.n_doctors:
-				patient = self.model.triage_nurses.high_priority.pop()
-				self.current_patients.append((patient, self.model.current_tick))
-				self.n_busy += 1
-				patient.seeing_doc = True
+	def get_patient(self):
+		if self.model.triage_nurses.high_priority and self.n_busy < self.n_doctors:
+			patient = self.model.triage_nurses.high_priority.pop()
+			self.current_patients.append((patient, self.model.current_tick))
+			self.n_busy += 1
+			patient.seeing_doc = True
 
-			if not self.model.triage_nurses.high_priority and self.n_busy < self.n_doctors:
-				patient = self.triage_nurses.low_priority.pop()
-				self.current_patients.append((patient, self.model.current_tick))
-				self.n_busy += 1
-				patient.seeing_doc = True
-			return
+		if not self.model.triage_nurses.high_priority and self.n_busy < self.n_doctors:
+			patient = self.triage_nurses.low_priority.pop()
+			self.current_patients.append((patient, self.model.current_tick))
+			self.n_busy += 1
+			patient.seeing_doc = True
+		return
 
-		def step(self):
-			for i in range(n_doctors):
-				patient, entry_time = self.current_patients[i]
-				if (self.model.current_tick - entry_time) >= patient.service_time:
-					self.current_patients.pop(i)
-					self.n_busy -= 1
-					patient.discharged = True
+	def step(self):
+		for i in range(n_doctors):
+			patient, entry_time = self.current_patients[i]
+			if (self.model.current_tick - entry_time) >= patient.service_time:
+				self.current_patients.pop(i)
+				self.n_busy -= 1
+				patient.discharged = True
 
-			if self.n_busy < self.n_doctors:
-				self.get_patient()
+		if self.n_busy < self.n_doctors:
+			self.get_patient()
 
-			return
+		return
 
