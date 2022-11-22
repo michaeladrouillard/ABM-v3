@@ -1,4 +1,6 @@
 from mesa import Agent
+from mesa import Model 
+from mesa.time import RandomActivation
 import scipy.stats as ss
 
 # ctask 1 - immediate
@@ -37,7 +39,7 @@ class Patient(Agent):
 
 
 class TriageNurses(Agent):
-	def __init__(self, unique_id, model, n_nurses, patients):
+	def __init__(self, model, n_nurses):
 		super().__init__(unique_id, model, n_nurses)
 		self.entry_queue = []
 		self.n_busy = 0
@@ -51,7 +53,7 @@ class TriageNurses(Agent):
 
 	def step(self):
 		# Enter new patients into the triage entry queue
-		for patient in patients:
+		for patient in self.model.patients:
 			if patient.triage_queue:
 				self.entry_queue.insert(0)
 
@@ -77,8 +79,8 @@ class TriageNurses(Agent):
 			self.patients_triaging.append((patient, self.model.current_tick))
 		return
 
-class Doctor(Agent):
-	def __init__(self, unique_id, model, n_doctors):
+class Doctors(Agent):
+	def __init__(self, model, n_doctors):
 		super().__init__(unique_id, model, n_doctors)
 		self.backlog = []
 		self.n_busy = 0
@@ -110,4 +112,28 @@ class Doctor(Agent):
 			self.get_patient()
 
 		return
+
+class ERModel(Model):
+	def __init__(self, n_patients, n_triage_nurses, n_doctors, ticks, ctask_dist, service_distribution):
+		self.ticks = ticks
+		self.current_tick = 1
+		self.n_patients = n_patients
+		self.n_triage_nurses = n_triage_nurses
+		self.n_doctors = n_doctors
+		self.ctask_dist = ctask_dist
+		self.service_distribution = service_distribution
+
+
+		self.schedule = RandomActivation(self)
+		self.patients = [Patient(i, model, ctask_dist, service_distribution) for i in range(self.n_patients)]
+		self.triage_nurses = TriageNurses(model, self.n_triage_nurses)
+		self.doctors = Doctors(model, self.n_doctors)
+
+	def step(self):
+		self.schedule.step()
+		self.current_tick += 1
+
+		return
+
+
 
