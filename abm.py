@@ -71,6 +71,10 @@ class TriageNurses(Agent):
 
 				if (self.model.current_tick - entry_time) >= patient.triage_time:
 
+					if (patients.ctask_status == 1):
+						self.model.doctors.critical_patients.insert(0, patient)
+						patient_triaged = True
+
 					if (patient.ctask_status == 2) or (patient.ctask_status == 3):
 						self.high_priority_queue.insert(0, patient)
 						patient.triaged = True
@@ -99,8 +103,11 @@ class Doctors(Agent):
 		self.backlog = []
 		self.n_busy = 0
 		self.current_patients = []
+		self.critical_patients = []
 
 	def get_patient(self):
+		if self.critical_patients:
+			for patient in self.current_patients:
 		if self.model.triage_nurses.high_priority_queue and self.n_busy < self.n_doctors:
 			patient = self.model.triage_nurses.high_priority_queue.pop()
 			self.current_patients.append((patient, self.model.current_tick))
@@ -167,7 +174,16 @@ def get_patients_arrived(model):
 	return np.sum(patients_arrived)
 
 def get_patients_discharged(model):
-	patients_discharged = []
+	patients_discharged = [patient.discharged for patient in model.patients]
+	return np.sum(patients_discharged)
+
+def get_patients_triaged(model):
+	patients_triaged = [patient.triaged for patient in model.patients]
+	return np.sum(patients_triaged)
+
+def get_patients_seeing_doc(model):
+	patients_seeing_doc = [patient.seeing_doc for patient in model.patients]
+	return np.sum(patients_seeing_doc)
 
 def main(args):
 	ctask_dist = [0.02, 0.25, 0.35, 0.28, 0.1]
