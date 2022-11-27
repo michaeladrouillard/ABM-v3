@@ -4,6 +4,7 @@ from mesa import Model
 from mesa.time import RandomActivation
 import scipy.stats as ss
 import numpy as np
+import copy
 
 # ctask 1 - immediate
 # ctask 2 - 15 minutes
@@ -54,30 +55,37 @@ class TriageNurses(Agent):
 		self.high_priority_queue = []
 
 		# ctask 4 and ctask 5
-		self.low_prioity_queue = []
+		self.low_priority_queue = []
 
 	def step(self):
 		# Enter new patients into the triage entry queue
 		for patient in self.model.patients:
 			if patient.triage_queue:
-				self.entry_queue.insert(0)
+				self.entry_queue.insert(0, patient)
 
 		# Release patients from nurses if time is up
-		for i in range(self.n_nurses):
-			patient, entry_time = self.patients_triaging[i]
-			if (self.model.current_tick - entry_time) >= patient.triage_time:
+		if self.patients_triaging:
+			patient_triage_copy = copy.deepcopy(self.patients_triaging)
+			for i in range(len(self.patients_triaging)):
+				patient, entry_time = self.patients_triaging[i]
 
-				if (patient.ctask_status == 2) or (patient.ctask_status == 3):
-					self.high_priority.queue.insert(0)
-				else:
-					self.low_priority.queue.insert(0)
+				if (self.model.current_tick - entry_time) >= patient.triage_time:
 
-				self.patients_triaging.pop(i)
-				self.n_busy -= 1
-				patient.triaged = True
+					if (patient.ctask_status == 2) or (patient.ctask_status == 3):
+						self.high_priority_queue.insert(0, patient)
+						patient.triaged = True
+					else:
+						self.low_priority_queue.insert(0, patient)
+						patient.triaged = True
+
+					patient_triage_copy.pop(i)
+					self.n_busy -= 1
+					patient.triaged = True
+
+			self.patients_triaging = patient_triage_copy
 
 		# Check if any nurse is free
-		if n_busy < n_nurses:
+		if self.n_busy < self.n_nurses and self.entry_queue:
 			# Add someone to get triaged
 			self.n_busy += 1
 			patient = self.entry_queue.pop()
@@ -93,30 +101,33 @@ class Doctors(Agent):
 		self.current_patients = []
 
 	def get_patient(self):
-		if self.model.triage_nurses.high_priority and self.n_busy < self.n_doctors:
-			patient = self.model.triage_nurses.high_priority.pop()
+		if self.model.triage_nurses.high_priority_queue and self.n_busy < self.n_doctors:
+			patient = self.model.triage_nurses.high_priority_queue.pop()
 			self.current_patients.append((patient, self.model.current_tick))
 			self.n_busy += 1
 			patient.seeing_doc = True
 
-		if not self.model.triage_nurses.high_priority and self.n_busy < self.n_doctors:
-			patient = self.triage_nurses.low_priority.pop()
+		if self.model.triage_nurses.low_priority_queue and self.n_busy < self.n_doctors:
+			patient = self.model.triage_nurses.low_priority_queue.pop()
 			self.current_patients.append((patient, self.model.current_tick))
 			self.n_busy += 1
 			patient.seeing_doc = True
 		return
 
 	def step(self):
-		for i in range(self.n_doctors):
-			patient, entry_time = self.current_patients[i]
-			if (self.model.current_tick - entry_time) >= patient.service_time:
-				self.current_patients.pop(i)
-				self.n_busy -= 1
-				patient.discharged = True
-
 		if self.n_busy < self.n_doctors:
 			self.get_patient()
 
+
+		if self.current_patients: 
+			current_patients_copy = self.current_patients
+			for i in range(len(self.current_patients)):
+				patient, entry_time = current_patients_copy[i]
+				if (self.model.current_tick - entry_time) >= patient.er_service_time:
+					current_patients_copy.pop(i)
+					self.n_busy -= 1
+					patient.discharged = True
+			self.current_patients = current_patients_copy
 		return
 
 class ERModel(Model):
@@ -151,9 +162,16 @@ class ERModel(Model):
 
 		return
 
+def get_patients_arrived(model):
+	patients_arrived = [patient._triage_queue for patient in model.patients]
+	return np.sum(patients_arrived)
+
+def get_patients_discharged(model):
+	patients_discharged = []
+
 def main(args):
 	ctask_dist = [0.02, 0.25, 0.35, 0.28, 0.1]
-	service_dist = [80, 45, 35, 20, 15]
+	service_dist = [80 * 60, 45 * 60, 35 * 60, 20 * 60, 15 * 60]
 	ticks = args.ticks
 	er_model = ERModel(args.n_patients, args.n_triage_nurses, args.n_doctors, ticks, ctask_dist, service_dist)
 
@@ -165,7 +183,7 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument(
 		'--n_patients',
-		default = 200,
+		default = 50,
 		type = int)
 
 	parser.add_argument(
@@ -181,7 +199,7 @@ if __name__ == '__main__':
 		)
 	parser.add_argument(
 		'--ticks',
-		default=500,
+		default=3600,
 		type=int
 		)
 	args = parser.parse_args()
