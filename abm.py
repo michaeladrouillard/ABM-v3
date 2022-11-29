@@ -29,7 +29,7 @@ class Patient(Agent):
 		self.discharged = False
 
 		self.leave_triage_queue_time = None
-		self.leave_priority_queues_time = None
+		self.leave_priority_queue_time = None
 		self.discharge_time = None
 
 	def get_triaged(self):
@@ -70,13 +70,14 @@ class TriageNurses(Agent):
 
 		# Release patients from nurses if time is up
 		if self.patients_triaging:
-			patient_triage_copy = copy.deepcopy(self.patients_triaging)
+			# patient_triage_copy = ctaskopy.deepcopy(self.patients_triaging)
+			patient_to_pop = []
 			for i in range(len(self.patients_triaging)):
 				patient, entry_time = self.patients_triaging[i]
 
 				if (self.model.current_tick - entry_time) >= patient.triage_time:
 
-					if patients.ctask_status == 1:
+					if patient.ctask_status == 1:
 						self.model.doctors.critical_patients.insert(0, patient)
 						patient.triaged = True
 
@@ -87,11 +88,19 @@ class TriageNurses(Agent):
 						self.low_priority_queue.insert(0, patient)
 						patient.triaged = True
 
-					patient_triage_copy.pop(i)
+					# patient_triage_copy.pop(i)
+					patient_to_pop.append(i)
 					self.n_busy -= 1
 					patient.triaged = True
 
-			self.patients_triaging = patient_triage_copy
+			for i in patient_to_pop:
+				try:
+					self.patients_triaging.pop(i)
+				except:
+					pass
+
+
+			# self.patients_triaging = patient_triage_copy
 
 		# Check if any nurse is free
 		if self.n_busy < self.n_nurses and self.entry_queue:
@@ -119,18 +128,18 @@ class Doctors(Agent):
 
 			# If a critical patient exists, remove the lowest priority patient right now
 			# Keep track of their remaining ER time
+			if self.current_patients:
+				for i, patient in enumerate(self.current_patients):
+					if patient.ctask_status < min_ctask:
+						backlog_patient = i
+						min_ctask = patient.ctask_status
 
-			for i, patient in enumerate(self.current_patients):
-				if patient.ctask_status < min_ctask:
-					backlog_patient = i
-					min_ctask = patient.ctask_status
+				backlog_patient, entry_time = self.current_patients.pop(backlog_patient)
 
-			backlog_patient, entry_time = self.current_patients.pop(backlog_patient)
+				# This is the start time after the patients gets re-inputted
+				remaining_time = self.model.current_tick - entry_time
 
-			# This is the start time after the patients gets re-inputted
-			remaining_time = self.model.current_tick - entry_time
-
-			self.backlog.insert(0, (backlog_patient, remaining_time))
+				self.backlog.insert(0, (backlog_patient, remaining_time))
 
 			self.current_patients.append((critical_patient, self.model.current_tick))
 			self.n_critical += 1
@@ -159,16 +168,23 @@ class Doctors(Agent):
 
 		if self.current_patients: 
 			current_patients_copy = self.current_patients
+			patients_to_pop = []
 			for i in range(len(self.current_patients)):
 				patient, entry_time = current_patients_copy[i]
 				if (self.model.current_tick - entry_time) >= patient.er_service_time:
 					if patient.ctask_status == 1:
 						self.n_critical -= 1
-					current_patients_copy.pop(i)
+					# current_patients_copy.pop(i)
+					patients_to_pop.append(i)
 					self.n_busy -= 1
 					patient.discharged = True
 					patient.discharge_time = self.model.current_tick
-			self.current_patients = current_patients_copy
+			for i in patients_to_pop:
+				try:
+					self.current_patients.pop(i)
+				except:
+					pass
+			# self.current_patients = current_patients_copy
 		return
 
 class ERModel(Model):
@@ -207,7 +223,10 @@ class ERModel(Model):
 				'High Priority Queue Size': get_high_priority_queue,
 				'Patients Triaging': get_patients_triaging,
 				'Backlog': get_backlog,
-				'Critical Patients': get_critical_patients
+				'Critical Patients': get_critical_patients,
+				'Leave Triage Queue Time': get_leave_triage_queue_time,
+				'Leave Priority Queue Time': get_leave_priority_queue_time,
+				'Discharge Time': get_discharge_time
 			}
 		)
 
@@ -220,7 +239,7 @@ class ERModel(Model):
 		return
 
 def get_patients_arrived(model):
-	patients_arrived = [patient._triage_queue for patient in model.patients]
+	patients_arrived = [patient.triage_queue for patient in model.patients]
 	return np.sum(patients_arrived)
 
 def get_patients_discharged(model):
@@ -254,7 +273,17 @@ def get_critical_patients(model):
 	return len(model.doctors.critical_patients)
 
 def get_leave_triage_queue_time(model):
-	patients = [np.nan if patient.triage_queue is False else patient.]
+	patients = [np.nan if patient.leave_triage_queue_time is None else patient.leave_triage_queue_time for patient in model.patients]
+	return np.nanmean(patients)
+
+def get_leave_priority_queue_time(model):
+	patients = [np.nan if patient.leave_priority_queue_time is None else patient.leave_priority_queue_time for patient in model.patients]
+	return np.nanmean(patients)
+
+def get_discharge_time(model):
+	patients = [np.nan if patient.discharge_time is None else patient.discharge_time for patient in model.patients]
+	return np.nanmean(patients)
+
 
 def main(args):
 	ctask_dist = [0.02, 0.25, 0.35, 0.28, 0.1]
@@ -265,12 +294,15 @@ def main(args):
 	for i in range(ticks):
 		er_model.step()
 
+	run_stats = er_model.datacollector.get_model_vars_dataframe()
+	print(run_stats)
+
 
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument(
 		'--n_patients',
-		default = 50,
+		default = 5,
 		type = int)
 
 	parser.add_argument(
@@ -286,7 +318,7 @@ if __name__ == '__main__':
 		)
 	parser.add_argument(
 		'--ticks',
-		default=3600,
+		default=20,
 		type=int
 		)
 	args = parser.parse_args()
