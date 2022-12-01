@@ -5,6 +5,9 @@ from mesa import DataCollector
 from mesa.time import RandomActivation
 import scipy.stats as ss
 import numpy as np
+import os
+import json
+from datetime import date, datetime
 import copy
 
 # ctask 1 - immediate
@@ -129,7 +132,8 @@ class Doctors(Agent):
 			# If a critical patient exists, remove the lowest priority patient right now
 			# Keep track of their remaining ER time
 			if self.current_patients:
-				for i, patient in enumerate(self.current_patients):
+				for i, patient, time in enumerate(self.current_patients):
+					print(patient)
 					if patient.ctask_status < min_ctask:
 						backlog_patient = i
 						min_ctask = patient.ctask_status
@@ -140,7 +144,7 @@ class Doctors(Agent):
 				remaining_time = self.model.current_tick - entry_time
 
 				self.backlog.insert(0, (backlog_patient, remaining_time))
-
+			critical_patient = self.critical_patients.pop()
 			self.current_patients.append((critical_patient, self.model.current_tick))
 			self.n_critical += 1
 
@@ -296,6 +300,21 @@ def main(args):
 
 	run_stats = er_model.datacollector.get_model_vars_dataframe()
 	print(run_stats)
+
+	results_dir = os.path.join(os.path.abspath(os.getcwd()), 'results')
+
+	if not os.path.exists(results_dir):
+		os.mkdir(results_dir)
+
+	run_dir = os.path.join(results_dir, datetime.now().strftime('%d-%m-%Y_%H_%M_%S'))
+	os.mkdir(run_dir)
+
+
+	with open(os.path.join(run_dir, 'params.txt'), 'w') as f:
+		json.dump(args.__dict__, f, indent=2)
+
+	return
+
 
 
 if __name__ == '__main__':
