@@ -299,7 +299,7 @@ def main(args):
 		er_model.step()
 
 	run_stats = er_model.datacollector.get_model_vars_dataframe()
-	print(run_stats)
+	
 
 	results_dir = os.path.join(os.path.abspath(os.getcwd()), 'results')
 
@@ -312,6 +312,8 @@ def main(args):
 
 	with open(os.path.join(run_dir, 'params.txt'), 'w') as f:
 		json.dump(args.__dict__, f, indent=2)
+
+	run_stats.to_csv(os.path.join(run_dir, 'stats.csv'))
 
 	return
 
