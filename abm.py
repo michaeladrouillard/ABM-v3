@@ -31,9 +31,9 @@ class Patient(Agent):
 		self.seeing_doc = False
 		self.discharged = False
 
-		self.leave_triage_queue_time = None
-		self.leave_priority_queue_time = None
-		self.discharge_time = None
+		self.time_spent_triage_queue = None
+		self.time_spent_priority_queue = None
+		self.time_spent_discharge = None
 
 	def get_triaged(self):
 		self.triaged = True
@@ -44,9 +44,10 @@ class Patient(Agent):
 		return
 
 	def step(self):
-		print("PATIENT{} WORKING".format(self.unique_id))
-		if not self.triaged and (self.model.current_tick >= self.triage_entry_time):
+		# print("PATIENT{} WORKING".format(selflf.unique_id))
+		if not self.triage_queue and (self.model.current_tick >= self.triage_entry_time):
 			self.triage_queue = True
+			self.model.triage_nurses.entry_queue.insert(0, (self, self.model.current_tick))
 
 		return
 
@@ -66,10 +67,6 @@ class TriageNurses(Agent):
 		self.low_priority_queue = []
 
 	def step(self):
-		# Enter new patients into the triage entry queue
-		for patient in self.model.patients:
-			if patient.triage_queue:
-				self.entry_queue.insert(0, patient)
 
 		# Release patients from nurses if time is up
 		if self.patients_triaging:
@@ -85,10 +82,10 @@ class TriageNurses(Agent):
 						patient.triaged = True
 
 					if (patient.ctask_status == 2) or (patient.ctask_status == 3):
-						self.high_priority_queue.insert(0, patient)
+						self.high_priority_queue.insert(0, (patient, self.model.current_tick))
 						patient.triaged = True
 					else:
-						self.low_priority_queue.insert(0, patient)
+						self.low_priority_queue.insert(0, (patient, self.model.current_tick))
 						patient.triaged = True
 
 					# patient_triage_copy.pop(i)
@@ -109,8 +106,8 @@ class TriageNurses(Agent):
 		if self.n_busy < self.n_nurses and self.entry_queue:
 			# Add someone to get triaged
 			self.n_busy += 1
-			patient = self.entry_queue.pop()
-			patient.leave_triage_queue_time = self.model.current_tick
+			patient, entry_time = self.entry_queue.pop()
+			patient.time_spent_triage_queue = self.model.current_tick - entry_time
 			self.patients_triaging.append((patient, self.model.current_tick))
 		return
 
@@ -126,14 +123,15 @@ class Doctors(Agent):
 
 	def get_patient(self):
 		if self.critical_patients and self.n_critical < self.n_doctors:
+			print('CRITICAL')
 			min_ctask = 10000
 			backlog_patient = None
 
 			# If a critical patient exists, remove the lowest priority patient right now
 			# Keep track of their remaining ER time
 			if self.current_patients:
-				for i, patient, time in enumerate(self.current_patients):
-					print(patient)
+				for i, tuple in enumerate(self.current_patients):
+					patient, time = tuple
 					if patient.ctask_status < min_ctask:
 						backlog_patient = i
 						min_ctask = patient.ctask_status
@@ -142,7 +140,7 @@ class Doctors(Agent):
 
 				# This is the start time after the patients gets re-inputted
 				remaining_time = self.model.current_tick - entry_time
-
+				backlog_patient.seeing_doc = False
 				self.backlog.insert(0, (backlog_patient, remaining_time))
 			critical_patient = self.critical_patients.pop()
 			self.current_patients.append((critical_patient, self.model.current_tick))
@@ -151,25 +149,31 @@ class Doctors(Agent):
 			if self.n_busy < self.n_doctors:
 				self.n_busy += 1
 
+		if self.backlog and self.n_busy < self.n_doctors:
+			patient, entry_time = self.backlog.pop()
+			self.current_patients.append((patient, entry_time))
+			self.n_busy += 1
+			patient.seeing_doc = True
+
+
 		if self.model.triage_nurses.high_priority_queue and self.n_busy < self.n_doctors:
-			patient = self.model.triage_nurses.high_priority_queue.pop()
-			patient.leave_priority_queue_time = self.model.current_tick
+			print('HIGH PRIORITY POP')
+			patient, entry_time = self.model.triage_nurses.high_priority_queue.pop()
+			patient.time_spent_priority_queue = self.model.current_tick - entry_time
 			self.current_patients.append((patient, self.model.current_tick))
 			self.n_busy += 1
 			patient.seeing_doc = True
 
 		if self.model.triage_nurses.low_priority_queue and self.n_busy < self.n_doctors:
-			patient = self.model.triage_nurses.low_priority_queue.pop()
-			patient.leave_priority_queue_time = self.model.current_tick
+			print('LOW PRIORITY POP')
+			patient, entry_time = self.model.triage_nurses.low_priority_queue.pop()
+			patient.time_spent_priority_queue = self.model.current_tick - entry_time
 			self.current_patients.append((patient, self.model.current_tick))
 			self.n_busy += 1
 			patient.seeing_doc = True
 		return
 
 	def step(self):
-		if self.n_busy < self.n_doctors:
-			self.get_patient()
-
 		if self.current_patients: 
 			current_patients_copy = self.current_patients
 			patients_to_pop = []
@@ -178,16 +182,18 @@ class Doctors(Agent):
 				if (self.model.current_tick - entry_time) >= patient.er_service_time:
 					if patient.ctask_status == 1:
 						self.n_critical -= 1
-					# current_patients_copy.pop(i)
 					patients_to_pop.append(i)
 					self.n_busy -= 1
 					patient.discharged = True
-					patient.discharge_time = self.model.current_tick
+					patient.time_spent_discharge = self.model.current_tick - patient.triage_entry_time
 			for i in patients_to_pop:
 				try:
 					self.current_patients.pop(i)
 				except:
 					pass
+
+		if self.n_busy < self.n_doctors:
+			self.get_patient()
 			# self.current_patients = current_patients_copy
 		return
 
@@ -228,14 +234,15 @@ class ERModel(Model):
 				'Patients Triaging': get_patients_triaging,
 				'Backlog': get_backlog,
 				'Critical Patients': get_critical_patients,
-				'Leave Triage Queue Time': get_leave_triage_queue_time,
-				'Leave Priority Queue Time': get_leave_priority_queue_time,
+				'Time Spent in Triage Queue': get_time_spent_triage_queue,
+				'Time Spent in Priority Queue': get_time_spent_priority_queue,
+				'Time Spent in Low Priority Queue': get_time_spent_low_priority_queue,
+				'Time Spent in High Priority Queue': get_time_spent_high_priority_queue,
 				'Discharge Time': get_discharge_time
 			}
 		)
 
 	def step(self):
-		print("STEP")
 		self.datacollector.collect(self)
 		self.schedule.step()
 		self.current_tick += 1
@@ -276,22 +283,30 @@ def get_backlog(model):
 def get_critical_patients(model):
 	return len(model.doctors.critical_patients)
 
-def get_leave_triage_queue_time(model):
-	patients = [np.nan if patient.leave_triage_queue_time is None else patient.leave_triage_queue_time for patient in model.patients]
+def get_time_spent_triage_queue(model):
+	patients = [np.nan if patient.time_spent_triage_queue is None else patient.time_spent_triage_queue for patient in model.patients]
 	return np.nanmean(patients)
 
-def get_leave_priority_queue_time(model):
-	patients = [np.nan if patient.leave_priority_queue_time is None else patient.leave_priority_queue_time for patient in model.patients]
+def get_time_spent_priority_queue(model):
+	patients = [np.nan if patient.time_spent_priority_queue is None else patient.time_spent_priority_queue for patient in model.patients]
+	return np.nanmean(patients)
+
+def get_time_spent_low_priority_queue(model):
+	patients = [np.nan if patient.ctask_status in [2, 3] or patient.time_spent_priority_queue is None else patient.time_spent_priority_queue for patient in model.patients]
+	return np.nanmean(patients)
+
+def get_time_spent_high_priority_queue(model):
+	patients = [np.nan if patient.ctask_status in [4, 5] or patient.time_spent_priority_queue is None else patient.time_spent_priority_queue for patient in model.patients]
 	return np.nanmean(patients)
 
 def get_discharge_time(model):
-	patients = [np.nan if patient.discharge_time is None else patient.discharge_time for patient in model.patients]
+	patients = [np.nan if patient.time_spent_discharge is None else patient.time_spent_discharge for patient in model.patients]
 	return np.nanmean(patients)
 
 
 def main(args):
 	ctask_dist = [0.02, 0.25, 0.35, 0.28, 0.1]
-	service_dist = [80, 45, 35, 20, 15]
+	service_dist = [80, 20, 15, 10, 5]
 	ticks = args.ticks
 	er_model = ERModel(args.n_patients, args.n_triage_nurses, args.n_doctors, ticks, ctask_dist, service_dist)
 
@@ -339,7 +354,7 @@ if __name__ == '__main__':
 		)
 	parser.add_argument(
 		'--ticks',
-		default=20,
+		default=50,
 		type=int
 		)
 	args = parser.parse_args()
