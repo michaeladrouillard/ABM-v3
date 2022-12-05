@@ -23,7 +23,7 @@ class Patient(Agent):
 		self.unique_id = unique_id
 		self.ctask_status = np.random.choice(5, 1, ctask_dist)
 		self.er_service_time = ss.poisson(service_distribution[int(self.ctask_status - 1)]).rvs()
-		self.triage_entry_time = np.int(ss.beta(3, 3).rvs() * self.model.ticks) + 1
+		self.triage_entry_time = np.int(ss.beta(1, 3).rvs() * 100) + 1
 		self.triage_time = ss.poisson(3).rvs() + 1
 
 		self.triage_queue = False
@@ -103,7 +103,7 @@ class TriageNurses(Agent):
 			# self.patients_triaging = patient_triage_copy
 
 		# Check if any nurse is free
-		if self.n_busy < self.n_nurses and self.entry_queue:
+		if (len(self.patients_triaging) < self.n_nurses) and self.entry_queue:
 			# Add someone to get triaged
 			self.n_busy += 1
 			patient, entry_time = self.entry_queue.pop()
@@ -122,55 +122,54 @@ class Doctors(Agent):
 		self.n_critical = 0
 
 	def get_patient(self):
-		if self.critical_patients and self.n_critical < self.n_doctors:
-			print('CRITICAL')
-			min_ctask = 10000
-			backlog_patient = None
+		while (self.backlog or self.critical_patients or self.model.triage_nurses.high_priority_queue or self.model.triage_nurses.low_priority_queue) \
+			and (len(self.current_patients) < self.n_doctors):
+			if self.critical_patients and self.n_critical < self.n_doctors:
+				print('CRITICAL')
+				min_ctask = 10000
+				backlog_patient = None
 
-			# If a critical patient exists, remove the lowest priority patient right now
-			# Keep track of their remaining ER time
-			if self.current_patients:
-				for i, tuple in enumerate(self.current_patients):
-					patient, time = tuple
-					if patient.ctask_status < min_ctask:
-						backlog_patient = i
-						min_ctask = patient.ctask_status
+				# If a critical patient exists, remove the lowest priority patient right now
+				# Keep track of their remaining ER time
+				if self.current_patients:
+					for i, tuple in enumerate(self.current_patients):
+						patient, time = tuple
+						if patient.ctask_status < min_ctask:
+							backlog_patient = i
+							min_ctask = patient.ctask_status
 
-				backlog_patient, entry_time = self.current_patients.pop(backlog_patient)
+					backlog_patient, entry_time = self.current_patients.pop(backlog_patient)
 
-				# This is the start time after the patients gets re-inputted
-				remaining_time = self.model.current_tick - entry_time
-				backlog_patient.seeing_doc = False
-				self.backlog.insert(0, (backlog_patient, remaining_time))
-			critical_patient = self.critical_patients.pop()
-			self.current_patients.append((critical_patient, self.model.current_tick))
-			self.n_critical += 1
+					# This is the start time after the patients gets re-inputted
+					remaining_time = self.model.current_tick - entry_time
+					backlog_patient.seeing_doc = False
+					self.backlog.insert(0, (backlog_patient, remaining_time))
+				critical_patient = self.critical_patients.pop()
+				self.current_patients.append((critical_patient, self.model.current_tick))
+				self.n_critical += 1
 
-			if self.n_busy < self.n_doctors:
-				self.n_busy += 1
+				if self.n_busy < self.n_doctors:
+					self.n_busy += 1
 
-		if self.backlog and self.n_busy < self.n_doctors:
-			patient, entry_time = self.backlog.pop()
-			self.current_patients.append((patient, entry_time))
-			self.n_busy += 1
-			patient.seeing_doc = True
+			if self.backlog and (len(self.current_patients) < self.n_doctors):
+				patient, entry_time = self.backlog.pop()
+				self.current_patients.append((patient, entry_time))
+				patient.seeing_doc = True
 
 
-		if self.model.triage_nurses.high_priority_queue and self.n_busy < self.n_doctors:
-			print('HIGH PRIORITY POP')
-			patient, entry_time = self.model.triage_nurses.high_priority_queue.pop()
-			patient.time_spent_priority_queue = self.model.current_tick - entry_time
-			self.current_patients.append((patient, self.model.current_tick))
-			self.n_busy += 1
-			patient.seeing_doc = True
+			if self.model.triage_nurses.high_priority_queue and (len(self.current_patients) < self.n_doctors):
+				print("LENGTH OF HIGH PRI QUEUE IS {}".format(len(self.model.triage_nurses.high_priority_queue)))
+				patient, entry_time = self.model.triage_nurses.high_priority_queue.pop()
+				patient.time_spent_priority_queue = self.model.current_tick - entry_time
+				self.current_patients.append((patient, self.model.current_tick))
+				patient.seeing_doc = True
 
-		if self.model.triage_nurses.low_priority_queue and self.n_busy < self.n_doctors:
-			print('LOW PRIORITY POP')
-			patient, entry_time = self.model.triage_nurses.low_priority_queue.pop()
-			patient.time_spent_priority_queue = self.model.current_tick - entry_time
-			self.current_patients.append((patient, self.model.current_tick))
-			self.n_busy += 1
-			patient.seeing_doc = True
+			if self.model.triage_nurses.low_priority_queue and (len(self.current_patients) < self.n_doctors):
+				print("LENGTH OF LOW PRI QUEUE IS {}".format(len(self.model.triage_nurses.low_priority_queue)))
+				patient, entry_time = self.model.triage_nurses.low_priority_queue.pop()
+				patient.time_spent_priority_queue = self.model.current_tick - entry_time
+				self.current_patients.append((patient, self.model.current_tick))
+				patient.seeing_doc = True
 		return
 
 	def step(self):
@@ -192,8 +191,8 @@ class Doctors(Agent):
 				except:
 					pass
 
-		if self.n_busy < self.n_doctors:
-			self.get_patient()
+
+		self.get_patient()
 			# self.current_patients = current_patients_copy
 		return
 
@@ -262,8 +261,7 @@ def get_patients_triaged(model):
 	return np.sum(patients_triaged)
 
 def get_patients_seeing_doc(model):
-	patients_seeing_doc = [patient.seeing_doc for patient in model.patients]
-	return np.sum(patients_seeing_doc)
+	return len(model.doctors.current_patients)
 
 def get_triage_queue_size(model):
 	return len(model.triage_nurses.entry_queue)
@@ -305,7 +303,7 @@ def get_discharge_time(model):
 
 
 def main(args):
-	ctask_dist = [0.02, 0.25, 0.35, 0.28, 0.1]
+	ctask_dist = [0.01, 0.25, 0.35, 0.28, 0.11]
 	service_dist = [80, 20, 15, 10, 5]
 	ticks = args.ticks
 	er_model = ERModel(args.n_patients, args.n_triage_nurses, args.n_doctors, ticks, ctask_dist, service_dist)
