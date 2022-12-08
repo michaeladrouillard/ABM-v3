@@ -18,12 +18,12 @@ import copy
 
 
 class Patient(Agent):
-	def __init__(self, unique_id, model, ctask_dist, service_distribution):
+	def __init__(self, unique_id, model, ctask_dist, service_distribution, ticks):
 		super().__init__(unique_id, model)
 		self.unique_id = unique_id
 		self.ctask_status = np.random.choice(5, 1, ctask_dist)
 		self.er_service_time = ss.poisson(service_distribution[int(self.ctask_status - 1)]).rvs()
-		self.triage_entry_time = np.int(ss.beta(1, 3).rvs() * 100) + 1
+		self.triage_entry_time = np.int(ss.beta(1, 3).rvs() * ticks) + 1
 		self.triage_time = ss.poisson(3).rvs() + 1
 
 		self.triage_queue = False
@@ -112,7 +112,7 @@ class TriageNurses(Agent):
 		return
 
 class Doctors(Agent):
-	def __init__(self, unique_id, model, n_doctors):
+	def __init__(self, unique_id, model, n_doctors, alternate):
 		super().__init__(unique_id, model)
 		self.n_doctors = n_doctors
 		self.backlog = []
@@ -120,12 +120,18 @@ class Doctors(Agent):
 		self.current_patients = []
 		self.critical_patients = []
 		self.n_critical = 0
+		self.alternate = alternate
+		print("ALTERNATE: {}".format(self.alternate))
+		self.alternate_count = None
+
+		if self.alternate > 0:
+			print('CREATED')
+			self.alternate_count = 0
 
 	def get_patient(self):
 		while (self.backlog or self.critical_patients or self.model.triage_nurses.high_priority_queue or self.model.triage_nurses.low_priority_queue) \
 			and (len(self.current_patients) < self.n_doctors):
 			if self.critical_patients and self.n_critical < self.n_doctors:
-				print('CRITICAL')
 				min_ctask = 10000
 				backlog_patient = None
 
@@ -156,16 +162,25 @@ class Doctors(Agent):
 				self.current_patients.append((patient, entry_time))
 				patient.seeing_doc = True
 
+			if self.alternate_count and self.alternate_count == self.alternate and self.model.triage_nurses.high_priority_queue \
+					and self.model.triage_nurses.low_priority_queue and (len(self.current_patients) < self.n_doctors):
+
+				print("LENGTH OF LOW PRI QUEUE IS {}".format(len(self.model.triage_nurses.low_priority_queue)))
+				patient, entry_time = self.model.triage_nurses.low_priority_queue.pop()
+				patient.time_spent_priority_queue = self.model.current_tick - entry_time
+				self.current_patients.append((patient, self.model.current_tick))
+				patient.seeing_doc = True
+
 
 			if self.model.triage_nurses.high_priority_queue and (len(self.current_patients) < self.n_doctors):
-				print("LENGTH OF HIGH PRI QUEUE IS {}".format(len(self.model.triage_nurses.high_priority_queue)))
+				# print("LENGTH OF HIGH PRI QUEUE IS {}".format(len(self.model.triage_nurses.high_priority_queue)))
 				patient, entry_time = self.model.triage_nurses.high_priority_queue.pop()
 				patient.time_spent_priority_queue = self.model.current_tick - entry_time
 				self.current_patients.append((patient, self.model.current_tick))
 				patient.seeing_doc = True
 
 			if self.model.triage_nurses.low_priority_queue and (len(self.current_patients) < self.n_doctors):
-				print("LENGTH OF LOW PRI QUEUE IS {}".format(len(self.model.triage_nurses.low_priority_queue)))
+				# print("LENGTH OF LOW PRI QUEUE IS {}".format(len(self.model.triage_nurses.low_priority_queue)))
 				patient, entry_time = self.model.triage_nurses.low_priority_queue.pop()
 				patient.time_spent_priority_queue = self.model.current_tick - entry_time
 				self.current_patients.append((patient, self.model.current_tick))
@@ -173,6 +188,8 @@ class Doctors(Agent):
 		return
 
 	def step(self):
+
+
 		if self.current_patients: 
 			current_patients_copy = self.current_patients
 			patients_to_pop = []
@@ -191,13 +208,21 @@ class Doctors(Agent):
 				except:
 					pass
 
+		if self.alternate_count is not None:
+			if self.alternate_count > self.alternate:
+				self.alternate_count = 0
+			elif len(self.current_patients) == self.n_doctors:
+				pass
+			else:
+				self.alternate_count += 1
+
 
 		self.get_patient()
 			# self.current_patients = current_patients_copy
 		return
 
 class ERModel(Model):
-	def __init__(self, n_patients, n_triage_nurses, n_doctors, ticks, ctask_dist, service_dist):
+	def __init__(self, n_patients, n_triage_nurses, n_doctors, ticks, ctask_dist, service_dist, alternate):
 		self.ticks = ticks
 		self.current_tick = 1
 		self.n_patients = n_patients
@@ -210,7 +235,7 @@ class ERModel(Model):
 		self.schedule = RandomActivation(self)
 		self.patients = []
 		for i in range(self.n_patients):
-			patient = Patient(i, self, self.ctask_dist, self.service_dist)
+			patient = Patient(i, self, self.ctask_dist, self.service_dist, self.ticks)
 			self.schedule.add(patient)
 
 			self.patients.append(patient)
@@ -218,7 +243,7 @@ class ERModel(Model):
 		self.triage_nurses = TriageNurses(self.n_patients + 1, self, self.n_triage_nurses)
 		self.schedule.add(self.triage_nurses)
 
-		self.doctors = Doctors(self.n_patients + 2, self, self.n_doctors)
+		self.doctors = Doctors(self.n_patients + 2, self, self.n_doctors, alternate)
 		self.schedule.add(self.doctors)
 
 		self.datacollector = DataCollector(
@@ -306,7 +331,7 @@ def main(args):
 	ctask_dist = [0.01, 0.25, 0.35, 0.28, 0.11]
 	service_dist = [80, 20, 15, 10, 5]
 	ticks = args.ticks
-	er_model = ERModel(args.n_patients, args.n_triage_nurses, args.n_doctors, ticks, ctask_dist, service_dist)
+	er_model = ERModel(args.n_patients, args.n_triage_nurses, args.n_doctors, ticks, ctask_dist, service_dist, args.alternate)
 
 	for i in range(ticks):
 		er_model.step()
@@ -336,7 +361,7 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument(
 		'--n_patients',
-		default = 5,
+		default = 100,
 		type = int)
 
 	parser.add_argument(
@@ -347,14 +372,19 @@ if __name__ == '__main__':
 
 	parser.add_argument(
 		'--n_doctors',
-		default = 2,
+		default = 6,
 		type = int
 		)
 	parser.add_argument(
 		'--ticks',
-		default=50,
+		default=720,
 		type=int
 		)
+	parser.add_argument(
+		'--alternate',
+		default=0,
+		type=int
+	)
 	args = parser.parse_args()
 
 	main(args)
