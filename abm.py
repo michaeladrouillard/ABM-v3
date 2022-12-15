@@ -10,11 +10,6 @@ import json
 from datetime import date, datetime
 import copy
 
-# ctask 1 - immediate
-# ctask 2 - 15 minutes
-# ctask 3 - 45 min
-# ctask 4 - 60 min
-# ctask 5 - 120 min
 
 
 class Patient(Agent):
@@ -164,8 +159,6 @@ class Doctors(Agent):
 
 			if self.alternate_count and self.alternate_count == self.alternate and self.model.triage_nurses.high_priority_queue \
 					and self.model.triage_nurses.low_priority_queue and (len(self.current_patients) < self.n_doctors):
-
-				print("LENGTH OF LOW PRI QUEUE IS {}".format(len(self.model.triage_nurses.low_priority_queue)))
 				patient, entry_time = self.model.triage_nurses.low_priority_queue.pop()
 				patient.time_spent_priority_queue = self.model.current_tick - entry_time
 				self.current_patients.append((patient, self.model.current_tick))
@@ -183,6 +176,7 @@ class Doctors(Agent):
 				# print("LENGTH OF LOW PRI QUEUE IS {}".format(len(self.model.triage_nurses.low_priority_queue)))
 				patient, entry_time = self.model.triage_nurses.low_priority_queue.pop()
 				patient.time_spent_priority_queue = self.model.current_tick - entry_time
+				print("ENTERED AT: {}, TIME SPENT: {}".format(entry_time, patient.time_spent_priority_queue))
 				self.current_patients.append((patient, self.model.current_tick))
 				patient.seeing_doc = True
 		return
@@ -328,7 +322,7 @@ def get_discharge_time(model):
 
 
 def main(args):
-	ctask_dist = [0.01, 0.25, 0.35, 0.28, 0.11]
+	ctask_dist = [0.01173063, 0.03034033, 0.5435916 , 0.31875453, 0.09558291]
 	service_dist = [80, 20, 15, 10, 5]
 	ticks = args.ticks
 	er_model = ERModel(args.n_patients, args.n_triage_nurses, args.n_doctors, ticks, ctask_dist, service_dist, args.alternate)
@@ -339,12 +333,13 @@ def main(args):
 	run_stats = er_model.datacollector.get_model_vars_dataframe()
 	
 
-	results_dir = os.path.join(os.path.abspath(os.getcwd()), 'results')
+	results_dir = os.path.join(os.path.abspath(os.getcwd()), 'results2')
 
 	if not os.path.exists(results_dir):
 		os.mkdir(results_dir)
 
-	run_dir = os.path.join(results_dir, datetime.now().strftime('%d-%m-%Y_%H_%M_%S'))
+	specs ="docs_{}_nurses_{}_alt_{}".format(args.n_doctors, args.n_triage_nurses, args.alternate)
+	run_dir = os.path.join(results_dir, datetime.now().strftime('%d-%m-%Y_%H_%M_%S') + "_" + specs)
 	os.mkdir(run_dir)
 
 
@@ -366,7 +361,7 @@ if __name__ == '__main__':
 
 	parser.add_argument(
 		'--n_triage_nurses',
-		default = 3,
+		default = 4,
 		type = int
 		)
 
@@ -382,13 +377,9 @@ if __name__ == '__main__':
 		)
 	parser.add_argument(
 		'--alternate',
-		default=0,
+		default=3,
 		type=int
 	)
 	args = parser.parse_args()
 
 	main(args)
-
-
-
-
