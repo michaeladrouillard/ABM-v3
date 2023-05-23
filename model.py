@@ -1,8 +1,6 @@
-from Agents.company import *
-from Agents.country import *
+from Agents.companycountry import *
 from Agents.communication import *
 from Agents.resource import *
-
 
 import random
 from mesa import Agent, Model
