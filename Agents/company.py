@@ -1,6 +1,8 @@
 import random
 from mesa import Agent
 from mesa.time import RandomActivation
+from Agents.country import CountryAgent
+
 
 
 class CompanyAgent(Agent):
@@ -21,36 +23,19 @@ class CompanyAgent(Agent):
       self.capabilities_score += 1
 
     def cooperate_with(self, other_agent):
-        if isinstance(other_agent, CompanyAgent):
-            # Define the logic of cooperation with another company here.
-            if self.resources["money"] > 30 and other_agent.resources["chips"] > 30:
-                self.resources["money"] -= 10
-                other_agent.resources["money"] += 10
-                self.resources["chips"] += 10
-                other_agent.resources["chips"] -= 10
+        if self.resources["money"] > 30 and other_agent.resources["chips"] > 30:
+            self.resources["money"] -= 10
+            other_agent.resources["money"] += 10
+            self.resources["chips"] += 10
+            other_agent.resources["chips"] -= 10
 
-                # Decrease anxiety score due to successful cooperation
-                self.anxiety_score -= 1
-                other_agent.anxiety_score -= 1
+            # Decrease anxiety score due to successful cooperation
+            self.anxiety_score -= 1
+            other_agent.anxiety_score -= 1
 
-                return True  # Cooperation was successful
-            else:
-                return False  # Cooperation failed due to insufficient resources
-        elif isinstance(other_agent, CountryAgent):
-            # Define the logic of cooperation with a country here.
-            if self.resources["money"] > 30 and other_agent.resources["chips"] > 30:
-                self.resources["money"] -= 10
-                other_agent.resources["money"] += 10
-                self.resources["chips"] += 10
-                other_agent.resources["chips"] -= 10
-
-                # Decrease anxiety score due to successful cooperation
-                self.anxiety_score -= 1
-                other_agent.anxiety_score -= 1
-
-                return True  # Cooperation was successful
-            else:
-                return False  # Cooperation failed due to insufficient resources
+            return True  # Cooperation was successful
+        else:
+            return False  # Cooperation failed due to insufficient resources
 
 
     def receive_message(self, message):   
@@ -104,12 +89,13 @@ class CompanyAgent(Agent):
         elif self.resources["money"] <= 50 and self.talent > 3:  # lowered the thresholds
             self.lobby_government()
         elif len([agent for agent in self.model.schedule.agents if agent is not self]) > 0:
-            other = random.choice([agent for agent in self.model.schedule.agents if agent is not self])
+            # Choose to cooperate with a country agent
+            other = random.choice([agent for agent in self.model.schedule.agents if isinstance(agent, CountryAgent) and agent is not self])
             self.cooperate_with(other)
         else:
+            # Choose to cooperate with a company agent
             other = random.choice([agent for agent in self.model.schedule.agents if isinstance(agent, CompanyAgent) and agent is not self])
-            self.compete_with(other)
-
+            self.cooperate_with(other)
 
     def step(self):
         self.choose_action()

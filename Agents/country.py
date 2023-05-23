@@ -1,3 +1,4 @@
+from company import CompanyAgent
 import random
 from mesa import Agent
 from mesa.time import RandomActivation
@@ -68,36 +69,19 @@ class CountryAgent(Agent):
             return ''
 
     def cooperate_with(self, other_agent):
-        if isinstance(other_agent, CompanyAgent):
-            # Define the logic of cooperation with a company here.
-            if self.resources["money"] > 30 and other_agent.resources["chips"] > 30:
-                self.resources["money"] -= 10
-                other_agent.resources["money"] += 10
-                self.resources["chips"] += 10
-                other_agent.resources["chips"] -= 10
+        if self.resources["money"] > 30 and other_agent.resources["chips"] > 30:
+            self.resources["money"] -= 10
+            other_agent.resources["money"] += 10
+            self.resources["chips"] += 10
+            other_agent.resources["chips"] -= 10
 
-                # Decrease anxiety score due to successful cooperation
-                self.anxiety_score -= 1
-                other_agent.anxiety_score -= 1
+            # Decrease anxiety score due to successful cooperation
+            self.anxiety_score -= 1
+            other_agent.anxiety_score -= 1
 
-                return True  # Cooperation was successful
-            else:
-                return False  # Cooperation failed due to insufficient resources
-        elif isinstance(other_agent, CountryAgent):
-            # Define the logic of cooperation with another country here.
-            if self.resources["money"] > 30 and other_agent.resources["chips"] > 30:
-                self.resources["money"] -= 10
-                other_agent.resources["money"] += 10
-                self.resources["chips"] += 10
-                other_agent.resources["chips"] -= 10
-
-                # Decrease anxiety score due to successful cooperation
-                self.anxiety_score -= 1
-                other_agent.anxiety_score -= 1
-
-                return True  # Cooperation was successful
-            else:
-                return False  # Cooperation failed due to insufficient resources
+            return True  # Cooperation was successful
+        else:
+            return False  # Cooperation failed due to insufficient resources
 
     def impose_sanctions(self, other):
       #Implement the logic of imposing sanctions
@@ -110,26 +94,39 @@ class CountryAgent(Agent):
       else:
           return False #failed to impose sanctions
 
-    def choose_action(self):
-        if self.resources["money"] > 30 and self.resources["chips"] < 20:  # lowered the thresholds
-          other = random.choice([agent for agent in self.model.schedule.agents if agent is not self])
-          self.impose_sanctions(other)
-        elif self.anxiety_score > 7:  # Assuming a high anxiety level is above 7
-          # Make riskier decisions, e.g., approve a high cost project by going into debt
-          self.resources['money'] -= 60
-          self.approve_project(60)  # Just for demonstration, you can modify according to your needs
-        elif self.gdp < 5:  # If the country's GDP is less than 5 trillion dollars
-            # Make riskier decisions, e.g., approve a high cost project by going into debt
-            self.resources['money'] -= 60
-            self.approve_project(60)
-        elif len([agent for agent in self.model.schedule.agents if agent is not self]) > 0:
-            other = random.choice([agent for agent in self.model.schedule.agents if agent is not self])
+def choose_action(self):
+    if self.resources["money"] > 30 and self.resources["chips"] < 20:  # lowered the thresholds
+        # Check if there are any other agents to impose sanctions on
+        other_agents = [agent for agent in self.model.schedule.agents if agent is not self]
+        if other_agents:
+            other = random.choice(other_agents)
+            self.impose_sanctions(other)
+    elif self.anxiety_score > 7:  # Assuming a high anxiety level is above 7
+        # Make riskier decisions, e.g., approve a high cost project by going into debt
+        self.resources['money'] -= 60
+        self.approve_project(60)  # Just for demonstration, you can modify according to your needs
+    elif self.gdp < 5:  # If the country's GDP is less than 5 trillion dollars
+        # Make riskier decisions, e.g., approve a high cost project by going into debt
+        self.resources['money'] -= 60
+        self.approve_project(60)
+    else:
+        # Choose to cooperate with a country agent
+        country_agents = [agent for agent in self.model.schedule.agents if isinstance(agent, CountryAgent) and agent is not self]
+        if country_agents:
+            other = random.choice(country_agents)
             self.cooperate_with(other)
         else:
-            message_type = random.choice(['money', 'chips'])
-            message_content = self.evaluate_message_content(message_type)
-            receiver = random.choice([agent for agent in self.model.schedule.agents if agent is not self])
-            self.send_private_message(message_content, receiver)
+            # Choose to cooperate with a company agent
+            company_agents = [agent for agent in self.model.schedule.agents if isinstance(agent, CompanyAgent) and agent is not self]
+            if company_agents:
+                other = random.choice(company_agents)
+                self.cooperate_with(other)
+            else:
+                # If there are no agents left to cooperate with, send a message
+                message_type = random.choice(['money', 'chips'])
+                message_content = self.evaluate_message_content(message_type)
+                receiver = random.choice([agent for agent in self.model.schedule.agents if agent is not self])
+                self.send_private_message(message_content, receiver)
 
     def step(self):
         self.choose_action()
