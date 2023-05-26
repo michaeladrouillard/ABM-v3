@@ -108,7 +108,8 @@ class CountryAgent(Agent):
         self.company = None  # The CompanyAgent associated with this country, initialized to None
         self.debt = 0
         self.gdp = 0  # Initialize GDP to 0
-    
+        self.prev_resources = self.resources.copy()  # Copy of resource levels at the previous time step
+   
     def set_company(self, company_agent):
         self.company = company_agent  # Associate a CompanyAgent with this CountryAgent
         self.gdp = self.calculate_gdp()  # Update GDP after company agent is set
@@ -118,10 +119,13 @@ class CountryAgent(Agent):
         """Calculate the GDP based on the resources of the country and its affiliated company."""
         if self.company:
             company_resources = self.company.resources["money"] + self.company.resources["chips"]
+            # Let's assume that the capabilities score of the company directly contributes to the GDP
+            company_cap_score = self.company.capabilities_score
         else:
             company_resources = 0
+            company_cap_score = 0
         country_resources = self.resources["money"] + self.resources["chips"]
-        return company_resources + country_resources
+        return company_resources + country_resources + company_cap_score
 
     def approve_project(self, project_cost):
         self.debt += project_cost
@@ -132,35 +136,33 @@ class CountryAgent(Agent):
         receiver.receive_message(message)
 
     def send_public_message(self, message, channel):
-        # Sends a public message through a communication 
-        message_content = self.evaluate_message_content(message)
         distorted_message = self.model.communication_channels[channel].distort_message(message)
-        for agent in self.model.schedule.agents:  # The message is received by all agents
+        for agent in self.model.schedule.agents: 
             agent.receive_message(distorted_message)
   
     def receive_message(self, message):   
-        # A simple example of receiving a message: change anxiety level based on the message content
-        if "High Money" in message or "Very High Money" in message or "High Chips" in message or "Very High Chips" in message:
-            self.anxiety_score += 1
-        elif "Low Chips" in message:
-            self.anxiety_score -= 1
+        if "More Money" in message:
+            self.anxiety_score += self.model.communication_channels["Twitter"].distortion if "Twitter" in message else self.model.communication_channels["Press Conference"].distortion
+        elif "Less Money" in message:
+            self.anxiety_score -= self.model.communication_channels["Twitter"].distortion if "Twitter" in message else self.model.communication_channels["Press Conference"].distortion
+
 
     def evaluate_message_content(self, message_type):
-        """ Evaluate message content based on the message type and current resources. """
+        """Evaluate message content based on the message type and changes in resources."""
         if message_type == 'money':
-            if self.resources['money'] < 50:
-                return 'Low Money'
-            elif self.resources['money'] < 100:
-                return 'High Money'
+            if self.resources['money'] > self.prev_resources['money']:
+                return 'More Money'
+            elif self.resources['money'] < self.prev_resources['money']:
+                return 'Less Money'
             else:
-                return 'Very High Money'
+                return 'Same Money'
         elif message_type == 'chips':
-            if self.resources['chips'] < 20:
-                return 'Low Chips'
-            elif self.resources['chips'] < 50:
-                return 'High Chips'
+            if self.resources['chips'] > self.prev_resources['chips']:
+                return 'More Chips'
+            elif self.resources['chips'] < self.prev_resources['chips']:
+                return 'Less Chips'
             else:
-                return 'Very High Chips'
+                return 'Same Chips'
         else:
             return ''
 
@@ -169,7 +171,6 @@ class CountryAgent(Agent):
             self.resources["money"] -= 10
             other_agent.resources["money"] += 10
             self.resources["chips"] += 10
-            other_agent.resources["chips"] -= 10
 
             # Decrease anxiety score due to successful cooperation
             self.anxiety_score -= 1
@@ -191,39 +192,56 @@ class CountryAgent(Agent):
           return False #failed to impose sanctions
 
 def choose_action(self):
-    if self.resources["money"] > 30 and self.resources["chips"] < 20:  # lowered the thresholds
-        # Check if there are any other agents to impose sanctions on
-        other_agents = [agent for agent in self.model.schedule.agents if agent is not self]
-        if other_agents:
+    # Calculate current GDP
+    current_gdp = self.calculate_gdp()
+
+    # Choose the communication channel randomly
+    channel = random.choice(list(self.model.communication_channels.keys()))
+
+    # Check if there are any other agents to impose sanctions on
+    other_agents = [agent for agent in self.model.schedule.agents if agent is not self]
+    
+    if self.resources["money"] > 30 and self.resources["chips"] < 20 and other_agents:
+        prospective_money = self.resources["money"] - 10
+        prospective_gdp = prospective_money + self.resources["chips"]
+        if prospective_gdp > current_gdp:
             other = random.choice(other_agents)
             self.impose_sanctions(other)
-    elif self.anxiety_score > 7:  # Assuming a high anxiety level is above 7
-        # Make riskier decisions, e.g., approve a high cost project by going into debt
-        self.resources['money'] -= 60
-        self.approve_project(60)  # Just for demonstration, you can modify according to your needs
-    elif self.gdp < 5:  # If the country's GDP is less than 5 trillion dollars
-        # Make riskier decisions, e.g., approve a high cost project by going into debt
-        self.resources['money'] -= 60
-        self.approve_project(60)
-    else:
-        # Choose to cooperate with a country agent
-        country_agents = [agent for agent in self.model.schedule.agents if isinstance(agent, CountryAgent) and agent is not self]
-        if country_agents:
+            self.send_public_message(self.evaluate_message_content('money'), channel)
+
+    if self.anxiety_score > 7 or self.gdp < 5:
+        if self.resources["money"] > 60: 
+            prospective_money = self.resources["money"] - 60
+            prospective_gdp = prospective_money + self.resources["chips"]
+            if prospective_gdp > current_gdp:
+                self.resources['money'] -= 60
+                self.approve_project(60)
+                self.send_public_message(self.evaluate_message_content('money'), channel)
+
+    country_agents = [agent for agent in self.model.schedule.agents if isinstance(agent, CountryAgent) and agent is not self]
+    if country_agents and self.resources["money"] > 30 and self.resources["chips"] > 30:
+        prospective_money = self.resources["money"] - 10
+        prospective_chips = self.resources["chips"] + 10
+        prospective_gdp = prospective_money + prospective_chips
+        if prospective_gdp > current_gdp:
             other = random.choice(country_agents)
             self.cooperate_with(other)
-        else:
-            # Choose to cooperate with a company agent
-            company_agents = [agent for agent in self.model.schedule.agents if isinstance(agent, CompanyAgent) and agent is not self]
-            if company_agents:
-                other = random.choice(company_agents)
-                self.cooperate_with(other)
-            else:
-                # If there are no agents left to cooperate with, send a message
-                message_type = random.choice(['money', 'chips'])
-                message_content = self.evaluate_message_content(message_type)
-                receiver = random.choice([agent for agent in self.model.schedule.agents if agent is not self])
-                self.send_private_message(message_content, receiver)
+            self.send_public_message(self.evaluate_message_content('money'), channel)
 
-    def step(self):
-        self.choose_action()
+    company_agents = [agent for agent in self.model.schedule.agents if isinstance(agent, CompanyAgent) and agent is not self]
+    if company_agents and self.resources["money"] > 30 and self.resources["chips"] > 30:
+        prospective_money = self.resources["money"] - 10
+        prospective_chips = self.resources["chips"] + 10
+        prospective_gdp = prospective_money + prospective_chips
+        if prospective_gdp > current_gdp:
+            other = random.choice(company_agents)
+            self.cooperate_with(other)
+            self.send_public_message(self.evaluate_message_content('money'), channel)
+
+    self.send_public_message(self.evaluate_message_content('money'), channel)
+
+def step(self):
+    self.choose_action()
+    self.prev_resources = self.resources.copy()  # Save current resource levels for the next time step
+    self.gdp = self.calculate_gdp()
     

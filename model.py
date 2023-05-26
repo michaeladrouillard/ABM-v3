@@ -20,8 +20,9 @@ class GameModel(Model):
         self.invasion_probability = 0 #probability of invasion
         self.company_affiliations = {"US": "Nvidia", "China": "SMIC", "EU": "Infineon", "Japan": "Renesas", "Taiwan": "TSMC"}  # Company affiliations
         #Create agents
-        for i in range(self.num_agents):
-            country = random.choice(["US", "China", "EU", "Japan", "Taiwan"])
+        countries = ["US", "China", "EU", "Japan", "Taiwan"]
+        random.shuffle(countries)  # Shuffle the list to add randomness
+        for i, country in enumerate(countries[:N]):  # Use the first N countries from the shuffled list
             country_agent = CountryAgent(i*2+1, self, country)
             company = self.company_affiliations[country]
             company_agent = CompanyAgent(i*2, self, country_agent, company)
