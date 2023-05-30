@@ -5,7 +5,7 @@ from mesa.time import RandomActivation
 class MineAgent(Agent):
     def __init__(self, unique_id, model, country_agent):
         super().__init__(unique_id, model)
-        self.resources = {"silicon": 100}  # Initial resources
+        self.resources = {"silicon": 100, "money": 50, "chips": 0}  # Initial resources
         self.country_agent = country_agent
 
     def extract(self):

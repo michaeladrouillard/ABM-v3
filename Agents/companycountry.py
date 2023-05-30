@@ -1,13 +1,19 @@
 import random
 from mesa import Agent
 from mesa.time import RandomActivation
-
+import json
 
 class CompanyAgent(Agent):
     def __init__(self, unique_id, model, country_agent, company_name):
         super().__init__(unique_id, model)
+
+        # Load JSON file
+        with open('agent_config.json') as json_file:
+            data = json.load(json_file)
+
         self.talent = random.randint(1,10)  
-        self.resources = {"money": 100, "chips": 50}  
+        self.resources = {"money": 100, "chips": 50}
+        
         self.country_agent = country_agent 
         self.company_name = company_name  
         self.capabilities_score = 0
@@ -101,7 +107,7 @@ class CompanyAgent(Agent):
 
 
 class CountryAgent(Agent):
-    def __init__(self, unique_id, model, country, silicon_export_rate, processing_capacity):
+    def __init__(self, unique_id, model, country, silicon_export_rate=0, processing_capacity=0):
         super().__init__(unique_id, model)
         self.resources = {"money": 100, "chips": 50, "silicon": 0}  # Initial resources
         self.country = country  # Country the agent belongs to

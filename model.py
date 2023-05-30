@@ -26,22 +26,29 @@ class GameModel(Model):
         #Create agents
         countries = ["US", "China", "EU", "Japan", "Taiwan"]
         random.shuffle(countries)  # Shuffle the list to add randomness
+        agent_id = 0
         for i, country in enumerate(countries[:N]):  # Use the first N countries from the shuffled list
             country_config = self.config["countries"].get(country, {})
-            country_agent = CountryAgent(i*2+1, self, country, **country_config)
+            country_agent = CountryAgent(agent_id, self, country, **country_config)
+            agent_id += 1  # Increment the agent ID
             company = self.company_affiliations[country]
-            company_agent = CompanyAgent(i*2, self, country_agent, company)
+            company_agent = CompanyAgent(agent_id, self, country_agent, company)
+            agent_id += 1  # Increment the agent ID
             country_agent.set_company(company_agent)
             self.schedule.add(country_agent)
             self.schedule.add(company_agent)
 
-            # Add mine agents in China and processing plant agents in Japan
             if country == "China":
-                mine_agent = MineAgent(i*3, self, country_agent)
+                mine_agent = MineAgent(agent_id, self, country_agent)
                 self.schedule.add(mine_agent)
+                agent_id += 1  # Increment the agent ID
+
             elif country == "Japan":
-                processing_plant_agent = ProcessingPlantAgent(i*4, self, country_agent)
+                processing_plant_agent = ProcessingPlantAgent(agent_id, self, country_agent)
                 self.schedule.add(processing_plant_agent)
+                agent_id += 1  # Increment the agent ID
+
+
         # Create a random network of agents
         G = nx.erdos_renyi_graph(n=self.num_agents, p=0.1)
         self.network = nx.relabel_nodes(G, dict(zip(range(self.num_agents), self.schedule.agents)))
@@ -62,7 +69,7 @@ class GameModel(Model):
             agent_reporters={"Money": lambda a: a.resources["money"], 
                              "Chips": lambda a: a.resources["chips"],
                              "Talent": lambda a: a.talent if isinstance(a, CompanyAgent) else None,
-                             "Country": lambda a: a.get_country() if isinstance(a, CompanyAgent) else a.country,
+                             #"Country": lambda a: a.get_country() if isinstance(a, CompanyAgent) else a.country,
                              "Anxiety Level": lambda a: a.anxiety_score if isinstance(a, CountryAgent) else None,
                               "Capabilities Score": lambda a: a.capabilities_score if isinstance(a, CompanyAgent) else None})
 

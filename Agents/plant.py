@@ -5,6 +5,7 @@ from mesa.time import RandomActivation
 class ProcessingPlantAgent(Agent):
     def __init__(self, unique_id, model, country_agent):
         super().__init__(unique_id, model)
+        self.resources = {"chips": 50, "money": 50}
         self.country_agent = country_agent
 
     def process(self):
