@@ -101,15 +101,17 @@ class CompanyAgent(Agent):
 
 
 class CountryAgent(Agent):
-    def __init__(self, unique_id, model, country):
+    def __init__(self, unique_id, model, country, silicon_export_rate, processing_capacity):
         super().__init__(unique_id, model)
-        self.resources = {"money": 100, "chips": 50}  # Initial resources
+        self.resources = {"money": 100, "chips": 50, "silicon": 0}  # Initial resources
         self.country = country  # Country the agent belongs to
         self.anxiety_score = 0  # The anxiety level of the agent
         self.company = None  # The CompanyAgent associated with this country, initialized to None
         self.debt = 0
         self.gdp = 0  # Initialize GDP to 0
-        self.prev_resources = self.resources.copy()  # Copy of resource levels at the previous time step
+        self.prev_resources = self.resources.copy() 
+        self.silicon_export_rate = silicon_export_rate
+        self.processing_capacity = processing_capacity # Copy of resource levels at the previous time step
    
     def set_company(self, company_agent):
         self.company = company_agent  # Associate a CompanyAgent with this CountryAgent
