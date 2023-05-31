@@ -11,13 +11,23 @@ class CompanyAgent(Agent):
         with open('agent_config.json') as json_file:
             data = json.load(json_file)
 
-        self.talent = random.randint(1,10)  
-        self.resources = {"money": 100, "chips": 50}
+        company_data = data["CompanyAgent"]
+
+        self.talent = random.randint(*company_data["talent_range"]) 
+        self.resources = company_data["initial_resources"].copy()
         
         self.country_agent = country_agent 
         self.company_name = company_name  
         self.capabilities_score = 0
         self.anxiety_score = 0
+
+        self.project_launch_threshold = company_data["project_launch_threshold"]
+        self.government_lobby_money_threshold = company_data["government_lobby_money_threshold"]
+        self.cooperation_thresholds = company_data["cooperation_thresholds"]
+        self.project_launch_cost = company_data["project_launch_cost"]
+        self.government_lobby_talent_threshold = company_data["government_lobby_talent_threshold"]
+        self.competition_percentage = company_data["competition_percentage"]
+
 
     def get_country(self):
         return self.country_agent.country
@@ -27,11 +37,9 @@ class CompanyAgent(Agent):
       self.capabilities_score += 1
 
     def cooperate_with(self, other_agent):
-        if self.resources["money"] > 30 and other_agent.resources["chips"] > 30:
-            self.resources["money"] -= 10
-            other_agent.resources["money"] += 10
-            self.resources["chips"] += 10
-            other_agent.resources["chips"] -= 10
+        if (self.resources["money"] > self.cooperation_thresholds["money"] and self.cooperation_thresholds["chips"]):
+            self.resources["money"] -= self.cooperation_thresholds["money"]
+            other_agent.resources["chips"] -= self.cooperation_thresholds["chips"]
 
             # Decrease anxiety score due to successful cooperation
             self.anxiety_score -= 1
@@ -50,8 +58,8 @@ class CompanyAgent(Agent):
             self.anxiety_score += 1
 
     def launch_project(self):
-        if self.resources["money"] >= 30:  # Assuming launching a project requires 30 money
-            self.resources["money"] -= 30
+        if self.resources["money"] >= self.project_launch_cost:  # Assuming launching a project requires 30 money
+            self.resources["money"] -= self.project_launch_cost
             self.increase_capabilities()  # Launching a project increases capabilities
 
             # This decreases the country's level. Decrease own anxiety level, using a percentage decrease for demonstration
@@ -70,7 +78,7 @@ class CompanyAgent(Agent):
        
 
     def lobby_government(self):
-        if self.talent >= 5:  # Lobbying government requires talent score >= 5
+        if self.talent >=self.government_lobby_talent_threshold:  # Lobbying government requires talent score >= 5
             # Lobbying government might increase resources
             self.resources["money"] += random.randint(10, 20)  # Increase in money
             self.resources["chips"] += random.randint(5, 10)  # Increase in chips
@@ -88,9 +96,9 @@ class CompanyAgent(Agent):
 
 
     def choose_action(self):
-        if self.resources["money"] > 20:  # Condition for launching a project
+        if self.resources["money"] > self.project_launch_threshold:  # Condition for launching a project
             self.launch_project()
-        elif self.resources["money"] <= 50 and self.talent > 3:  # Condition for lobbying government
+        elif self.resources["money"] <= self.government_lobby_money_threshold and self.talent > self.government_lobby_talent_threshold:  # Condition for lobbying government
             self.lobby_government()
         elif len([agent for agent in self.model.schedule.agents if agent is not self]) > 0:
             # Choose to cooperate with a country agent
@@ -109,7 +117,14 @@ class CompanyAgent(Agent):
 class CountryAgent(Agent):
     def __init__(self, unique_id, model, country, silicon_export_rate=0, processing_capacity=0):
         super().__init__(unique_id, model)
-        self.resources = {"money": 100, "chips": 50, "silicon": 0}  # Initial resources
+
+        # Load JSON file
+        with open('agent_config.json') as json_file:
+            data = json.load(json_file)
+
+        country_data = data["CountryAgent"]
+
+        self.resources = country_data["initial_resources"].copy() 
         self.country = country  # Country the agent belongs to
         self.anxiety_score = 0  # The anxiety level of the agent
         self.company = None  # The CompanyAgent associated with this country, initialized to None
@@ -118,7 +133,12 @@ class CountryAgent(Agent):
         self.prev_resources = self.resources.copy() 
         self.silicon_export_rate = silicon_export_rate
         self.processing_capacity = processing_capacity # Copy of resource levels at the previous time step
-   
+
+        self.decision_thresholds = country_data["decision_thresholds"]
+        self.cooperation_thresholds = country_data["cooperation_thresholds"]
+        self.sanctions_cost = country_data["sanctions_cost"]
+        self.sanctions_percentage = country_data["sanctions_percentage"]
+  
     def set_company(self, company_agent):
         self.company = company_agent  # Associate a CompanyAgent with this CountryAgent
         self.gdp = self.calculate_gdp()  # Update GDP after company agent is set
@@ -175,27 +195,13 @@ class CountryAgent(Agent):
         else:
             return ''
 
-    def cooperate_with(self, other_agent):
-        if self.resources["money"] > 30 and other_agent.resources["chips"] > 30:
-            self.resources["money"] -= 10
-            other_agent.resources["money"] += 10
-            self.resources["chips"] += 10
-
-            # Decrease anxiety score due to successful cooperation
-            self.anxiety_score -= 1
-            other_agent.anxiety_score -= 1
-
-            return True  # Cooperation was successful
-        else:
-            return False  # Cooperation failed due to insufficient resources
-
     def impose_sanctions(self, other):
       #Implement the logic of imposing sanctions
       ### add probability of inherence
-      if self.resources["money"] > 30: #sanctions require money
-          self.resources["money"] -= 30 #pay for the sanctions
+      if self.resources["money"] > self.sanctions_cost: #sanctions require money
+          self.resources["money"] -= self.sanctions_cost #pay for the sanctions
           # ^ does this make sense?
-          other.resources["money"] -= other.resources["money"] * 0.2  # Other agent loses 20% of money
+          other.resources["money"] -= other.resources["money"] * self.sanctions_percentage  # Other agent loses 20% of money
           return True #succesfully imposed sanctions
       else:
           return False #failed to impose sanctions
@@ -210,7 +216,7 @@ class CountryAgent(Agent):
         # Check if there are any other agents to impose sanctions on
         other_agents = [agent for agent in self.model.schedule.agents if agent is not self]
     
-        if self.resources["money"] > 30 and self.resources["chips"] < 20 and other_agents:
+        if self.resources["money"] > self.decision_thresholds["money"][0] and self.resources["chips"] < self.decision_thresholds["chips"][0] and other_agents:
             prospective_money = self.resources["money"] - 10
             prospective_gdp = prospective_money + self.resources["chips"]
             if prospective_gdp > current_gdp:
@@ -218,27 +224,17 @@ class CountryAgent(Agent):
                 self.impose_sanctions(other)
                 self.send_public_message(self.evaluate_message_content('money'), channel)
 
-        if self.anxiety_score > 7 or self.gdp < 5:
-            if self.resources["money"] > 60: 
-                prospective_money = self.resources["money"] - 60
+        if self.anxiety_score > self.decision_thresholds["anxiety_score"][0] or self.gdp < self.decision_thresholds["gdp"][0]:
+            if self.resources["money"] > self.decision_thresholds["money"][1]: 
+                prospective_money = self.resources["money"] - self.decision_thresholds["money"][1]
                 prospective_gdp = prospective_money + self.resources["chips"]
                 if prospective_gdp > current_gdp:
-                    self.resources['money'] -= 60
+                    self.resources['money'] -= self.decision_thresholds["money"][1]
                     self.approve_project(60)
                     self.send_public_message(self.evaluate_message_content('money'), channel)
 
-        country_agents = [agent for agent in self.model.schedule.agents if isinstance(agent, CountryAgent) and agent is not self]
-        if country_agents and self.resources["money"] > 30 and self.resources["chips"] > 30:
-            prospective_money = self.resources["money"] - 10
-            prospective_chips = self.resources["chips"] + 10
-            prospective_gdp = prospective_money + prospective_chips
-            if prospective_gdp > current_gdp:
-                other = random.choice(country_agents)
-                self.cooperate_with(other)
-                self.send_public_message(self.evaluate_message_content('money'), channel)
-
         company_agents = [agent for agent in self.model.schedule.agents if isinstance(agent, CompanyAgent) and agent is not self]
-        if company_agents and self.resources["money"] > 30 and self.resources["chips"] > 30:
+        if company_agents and self.resources["money"] > self.decision_thresholds["money"][0]  and self.decision_thresholds["chips"][1]:
             prospective_money = self.resources["money"] - 10
             prospective_chips = self.resources["chips"] + 10
             prospective_gdp = prospective_money + prospective_chips
