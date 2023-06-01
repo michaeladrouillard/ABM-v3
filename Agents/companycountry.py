@@ -95,19 +95,63 @@ class CompanyAgent(Agent):
         return False  # This company loses
 
 
-    def choose_action(self):
-        if self.resources["money"] > self.project_launch_threshold:  # Condition for launching a project
-            self.launch_project()
-        elif self.resources["money"] <= self.government_lobby_money_threshold and self.talent > self.government_lobby_talent_threshold:  # Condition for lobbying government
-            self.lobby_government()
-        elif len([agent for agent in self.model.schedule.agents if agent is not self]) > 0:
-            # Choose to cooperate with a country agent
-            other = random.choice([agent for agent in self.model.schedule.agents if isinstance(agent, CountryAgent) and agent is not self])
-            self.cooperate_with(other)
+    def expected_gain_launch_project(self):
+        # Assume that the expected gain from launching a project is proportional to the capabilities score
+        if self.resources["money"] >= self.project_launch_cost:
+            return self.capabilities_score * 2  # The number 2 is arbitrary and can be adjusted
         else:
-            # Choose to cooperate with a company agent
-            other = random.choice([agent for agent in self.model.schedule.agents if isinstance(agent, CompanyAgent) and agent is not self])
-            self.cooperate_with(other)
+            return 0
+
+    def expected_gain_lobby_government(self):
+        # Assume that the expected gain from lobbying the government is proportional to the talent
+        if self.resources["money"] <= self.government_lobby_money_threshold and self.talent > self.government_lobby_talent_threshold:
+            return self.talent * 2  # The number 2 is arbitrary and can be adjusted
+        else:
+            return 0
+
+    def expected_gain_cooperate_with(self, other):
+        # Assume that the expected gain from cooperation is proportional to the sum of the agent's and the other agent's resources
+        if (self.resources["money"] > self.cooperation_thresholds["money"] and self.resources["chips"] > self.cooperation_thresholds["chips"]):
+            return sum(self.resources.values()) + sum(other.resources.values())
+        else:
+            return 0
+
+
+    def choose_action(self):
+        # Find all other company agents
+        other_companies = [agent for agent in self.model.schedule.agents if isinstance(agent, CompanyAgent) and agent is not self]
+
+        # Check if there are any other companies
+        if not other_companies:
+            other_company = None  # No other companies to cooperate with
+        else:
+            # Choose a random company to cooperate with
+            other_company = random.choice(other_companies)
+
+        # Calculate the average resources of other companies
+        average_money = sum(agent.resources["money"] for agent in other_companies) / len(other_companies) if other_companies else 0
+        average_chips = sum(agent.resources["chips"] for agent in other_companies) / len(other_companies) if other_companies else 0
+
+        # Calculate the resource factors, which are greater than 1 if the agent has less resources than average, and less than 1 otherwise
+        money_factor = 1 + (average_money - self.resources["money"]) / average_money if average_money > 0 else 1
+        chips_factor = 1 + (average_chips - self.resources["chips"]) / average_chips if average_chips > 0 else 1
+
+        actions = {
+            'launch_project': (self.expected_gain_launch_project() * money_factor * chips_factor, self.launch_project),
+            'lobby_government': (self.expected_gain_lobby_government() * money_factor, self.lobby_government),
+            'cooperate_with_country': (self.expected_gain_cooperate_with(self.country_agent) * money_factor * chips_factor, self.cooperate_with, self.country_agent),
+            'cooperate_with_company': (other_company and self.expected_gain_cooperate_with(other_company) * money_factor * chips_factor, self.cooperate_with, other_company)
+        }
+
+    # Choose the action with the highest expected gain
+        best_action, best_value = max(actions.items(), key=lambda item: item[1][0] if item[1] else -1)
+
+        if best_value and len(best_value) == 3:  # If the action requires another agent, call the action with the other agent as an argument
+            best_value[1](best_value[2])
+        elif best_value:  # Otherwise, call the action without arguments
+            best_value[1]()
+
+
 
 
     def step(self):
@@ -133,11 +177,18 @@ class CountryAgent(Agent):
         self.prev_resources = self.resources.copy() 
         self.silicon_export_rate = silicon_export_rate
         self.processing_capacity = processing_capacity # Copy of resource levels at the previous time step
+        self.research_capacity = 0
 
         self.decision_thresholds = country_data["decision_thresholds"]
         self.cooperation_thresholds = country_data["cooperation_thresholds"]
         self.sanctions_cost = country_data["sanctions_cost"]
         self.sanctions_percentage = country_data["sanctions_percentage"]
+        self.alliance_cost = country_data["alliance_cost"]
+        self.alliance_gain = country_data["alliance_gain"]
+        self.research_investment_cost = country_data["research_investment_cost"]
+        self.research_capacity_gain = country_data["research_capacity_gain"]
+
+        
   
     def set_company(self, company_agent):
         self.company = company_agent  # Associate a CompanyAgent with this CountryAgent
@@ -206,44 +257,101 @@ class CountryAgent(Agent):
       else:
           return False #failed to impose sanctions
 
+    def invest_in_research(self):
+        """Invest in research and increase research capacity."""
+        self.resources["money"] -= self.research_investment_cost
+        self.research_capacity += self.research_capacity_gain
+        # If there is a company affiliated with this country, they also benefit from the research investment
+        if self.company:
+            self.company.resources["money"] += self.research_capacity_gain
+        self.send_public_message(self.evaluate_message_content('money'), 'Twitter')  # Assume that this action is communicated via Twitter
+
+    def expected_gain_invest_in_research(self):
+        if self.resources["money"] > self.research_investment_cost:
+            return self.research_capacity_gain
+        else:
+            return 0
+    def expected_gain_form_alliance(self):
+        """Calculate the expected gain from forming an alliance."""
+
+        # Calculate the potential gain as the alliance_gain minus the alliance_cost
+        potential_gain = self.alliance_gain - self.alliance_cost
+
+        # If the agent doesn't have enough money to pay the alliance cost, the potential gain is negative
+        if self.resources["money"] < self.alliance_cost:
+            return -potential_gain
+
+        # If there are no other countries to form an alliance with, the potential gain is 0
+        if not any(isinstance(agent, CountryAgent) and agent is not self for agent in self.model.schedule.agents):
+            return 0
+
+        # Otherwise, return the potential gain
+        return potential_gain
+
+
+    def expected_gain_impose_sanctions(self):
+        """Calculate the expected gain from imposing sanctions."""
+
+        # Calculate the potential gain as the sanctions_percentage times the total money of all other countries
+        potential_gain = self.sanctions_percentage * sum(agent.resources["money"] for agent in self.model.schedule.agents if isinstance(agent, CountryAgent) and agent is not self)
+
+        # If the agent doesn't have enough money to pay the sanctions cost, the potential gain is negative
+        if self.resources["money"] < self.sanctions_cost:
+            return -potential_gain
+
+        # Otherwise, return the potential gain
+        return potential_gain
+
+    def form_alliance(self, other):   
+        """Form an alliance with another country and share the benefit."""
+
+        # Form an alliance
+        self.resources["money"] -= self.alliance_cost
+        self.research_capacity += self.alliance_gain
+
+        # The other country also benefits from the alliance
+        other.resources["money"] += self.alliance_gain
+
+        self.send_public_message(self.evaluate_message_content('money'), 'Press Conference')  # Assume that this action is communicated via Press Conference
+
+        return True  # Successfully formed an alliance
+
     def choose_action(self):
-        # Calculate current GDP
-        current_gdp = self.calculate_gdp()
+        # Find all other country agents
+        other_countries = [agent for agent in self.model.schedule.agents if isinstance(agent, CountryAgent) and agent is not self]
 
-        # Choose the communication channel randomly
-        channel = random.choice(list(self.model.communication_channels.keys()))
+        # Check if there are any other countries
+        if not other_countries:
+            other_country = None  # No other countries to take action with
+        else:
+            # Choose a random country to take action with
+            other_country = random.choice(other_countries)
 
-        # Check if there are any other agents to impose sanctions on
-        other_agents = [agent for agent in self.model.schedule.agents if agent is not self]
-    
-        if self.resources["money"] > self.decision_thresholds["money"][0] and self.resources["chips"] < self.decision_thresholds["chips"][0] and other_agents:
-            prospective_money = self.resources["money"] - 10
-            prospective_gdp = prospective_money + self.resources["chips"]
-            if prospective_gdp > current_gdp:
-                other = random.choice(other_agents)
-                self.impose_sanctions(other)
-                self.send_public_message(self.evaluate_message_content('money'), channel)
+        # Calculate the average resources of other countries
+        average_money = sum(agent.resources["money"] for agent in other_countries) / len(other_countries)
+        average_chips = sum(agent.resources["chips"] for agent in other_countries) / len(other_countries)
 
-        if self.anxiety_score > self.decision_thresholds["anxiety_score"][0] or self.gdp < self.decision_thresholds["gdp"][0]:
-            if self.resources["money"] > self.decision_thresholds["money"][1]: 
-                prospective_money = self.resources["money"] - self.decision_thresholds["money"][1]
-                prospective_gdp = prospective_money + self.resources["chips"]
-                if prospective_gdp > current_gdp:
-                    self.resources['money'] -= self.decision_thresholds["money"][1]
-                    self.approve_project(60)
-                    self.send_public_message(self.evaluate_message_content('money'), channel)
+        # Calculate the resource factors, which are greater than 1 if the agent has less resources than average, and less than 1 otherwise
+        money_factor = 1 + (average_money - self.resources["money"]) / average_money if average_money > 0 else 1
+        chips_factor = 1 + (average_chips - self.resources["chips"]) / average_chips if average_chips > 0 else 1
 
-        company_agents = [agent for agent in self.model.schedule.agents if isinstance(agent, CompanyAgent) and agent is not self]
-        if company_agents and self.resources["money"] > self.decision_thresholds["money"][0]  and self.decision_thresholds["chips"][1]:
-            prospective_money = self.resources["money"] - 10
-            prospective_chips = self.resources["chips"] + 10
-            prospective_gdp = prospective_money + prospective_chips
-            if prospective_gdp > current_gdp:
-                other = random.choice(company_agents)
-                self.cooperate_with(other)
-                self.send_public_message(self.evaluate_message_content('money'), channel)
+        # Calculate the expected gain of each action, multiplied by the resource factors
+        actions = {
+            'invest_in_research': (self.expected_gain_invest_in_research() * money_factor * chips_factor, self.invest_in_research),
+            'form_alliance': (self.expected_gain_form_alliance() * money_factor, self.form_alliance),
+            'impose_sanctions': (self.expected_gain_impose_sanctions() * money_factor, self.impose_sanctions)
+        }
 
-        self.send_public_message(self.evaluate_message_content('money'), channel)
+    # Choose the action with the highest expected gain
+        best_action, best_value = max(actions.items(), key=lambda item: item[1][0])
+
+        if best_action == 'invest_in_research':
+            best_value[1]()  # call invest_in_research()
+        elif best_action == 'form_alliance' and other_country:
+            best_value[1](other_country)  # call form_alliance(other_country)
+        elif best_action == 'impose_sanctions' and other_country:
+            best_value[1](other_country)  # call impose_sanctions(other_country)
+
 
     def step(self):
         self.choose_action()

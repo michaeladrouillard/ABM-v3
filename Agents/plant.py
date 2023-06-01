@@ -8,7 +8,7 @@ class ProcessingPlantAgent(Agent):
         super().__init__(unique_id, model)
         self.country_agent = country_agent
         self.country = country_agent.country 
-
+        self.anxiety_score  = 0
         # Load JSON file
         with open('Agents/agent_config.json') as json_file:
             data = json.load(json_file)

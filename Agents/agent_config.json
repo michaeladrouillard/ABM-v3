@@ -23,6 +23,10 @@
       },
       "sanctions_cost": 30,
       "sanctions_percentage": 0.2,
+      "alliance_cost": 20,
+      "alliance_gain": 10,
+      "research_investment_cost": 15,
+      "research_capacity_gain": 10,
       "cooperation_thresholds": {
         "money": 30,
         "chips": 30
