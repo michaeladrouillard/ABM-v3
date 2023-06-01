@@ -6,7 +6,7 @@ from mesa.time import RandomActivation
 class Resource:
   def __init__(self, name):
     self.name = name
-    self.quantity = quantity
+    #self.quantity = quantity
     #initialize other parameters for Resource here
 
   def transfer(self, sender, receiver, amount):

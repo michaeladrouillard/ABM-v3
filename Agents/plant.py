@@ -1,12 +1,22 @@
 import random
 from mesa import Agent
 from mesa.time import RandomActivation
+import json
 
 class ProcessingPlantAgent(Agent):
     def __init__(self, unique_id, model, country_agent):
         super().__init__(unique_id, model)
-        self.resources = {"chips": 50, "money": 50}
         self.country_agent = country_agent
+        self.country = country_agent.country 
+
+        # Load JSON file
+        with open('Agents/agent_config.json') as json_file:
+            data = json.load(json_file)
+
+        plant_data = data["ProcessingPlantAgent"]
+
+        # Set initial resources based on the JSON file
+        self.resources = plant_data["initial_resources"]
 
     def process(self):
         # A simple processing model

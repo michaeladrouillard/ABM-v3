@@ -1,12 +1,22 @@
 import random
 from mesa import Agent
 from mesa.time import RandomActivation
+import json
 
 class MineAgent(Agent):
     def __init__(self, unique_id, model, country_agent):
         super().__init__(unique_id, model)
-        self.resources = {"silicon": 100, "money": 50, "chips": 0}  # Initial resources
         self.country_agent = country_agent
+        self.country = country_agent.country 
+
+        # Load JSON file
+        with open('Agents/agent_config.json') as json_file:
+            data = json.load(json_file)
+
+        mine_data = data["MineAgent"]
+
+        # Set initial resources based on the JSON file
+        self.resources = mine_data["initial_resources"]
 
     def extract(self):
         # A simple extraction model

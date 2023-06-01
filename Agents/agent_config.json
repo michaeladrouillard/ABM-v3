@@ -33,6 +33,20 @@
         "anxiety_score": [7],
         "gdp": [5]
       }
+    },
+    "MineAgent": {
+      "initial_resources": {
+        "silicon": 100,
+        "money": 50,
+        "chips": 0
+      }
+    },
+    "ProcessingPlantAgent": {
+      "initial_resources": {
+        "chips": 50,
+        "money": 50,
+        "silicon": 0
+      }
     }
   }
   
