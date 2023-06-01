@@ -29,6 +29,8 @@ class GameModel(Model):
         agent_id = 0
         for i, country in enumerate(countries[:N]):  # Use the first N countries from the shuffled list
             country_config = self.config["countries"].get(country, {})
+            has_mine = country_config.pop('has_mine', False)
+            has_plant = country_config.pop('has_plant', False)
             country_agent = CountryAgent(agent_id, self, country, **country_config)
             agent_id += 1  # Increment the agent ID
             company = self.company_affiliations[country]
@@ -38,16 +40,14 @@ class GameModel(Model):
             self.schedule.add(country_agent)
             self.schedule.add(company_agent)
 
-            if country == "China":
+            if has_mine:
                 mine_agent = MineAgent(agent_id, self, country_agent)
                 self.schedule.add(mine_agent)
                 agent_id += 1  # Increment the agent ID
-
-            elif country == "Japan":
+            if has_plant:
                 processing_plant_agent = ProcessingPlantAgent(agent_id, self, country_agent)
                 self.schedule.add(processing_plant_agent)
                 agent_id += 1  # Increment the agent ID
-
 
         # Create a random network of agents
         G = nx.erdos_renyi_graph(n=self.num_agents, p=0.1)

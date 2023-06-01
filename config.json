@@ -8,22 +8,34 @@
   },
   "countries": {
     "China": {
-      "silicon_export_rate": 0.8,
+      "has_mine": true,
+      "has_plant": false,
+      "_comment": "www.statista.com/statistics/268108/world-silicon-production-by-country/#:~:text=China%20is%20the%20world's%20largest,tons%20in%20the%20same%20year",
+      "silicon_export_rate": 0.8, 
       "processing_capacity": 0.2
     },
     "Japan": {
+      "has_mine": true,
+      "has_plant": true,
+      "_comment": "https://www.pcbaaa.com/global-silicon-wafer-manufacturing-companies/#:~:text=SUMCO%20mainly%20manufactures%20and%20sales,as%20the%20silicon%20wafer%20material.",
       "silicon_export_rate": 0.1,
       "processing_capacity": 0.9
     },
     "US": {
+      "has_mine": true,
+      "has_plant": false,
       "silicon_export_rate": 0,
       "processing_capacity": 0
     },
     "EU": {
+      "has_mine": true,
+      "has_plant": false,
       "silicon_export_rate": 0,
       "processing_capacity": 0
     },
     "Taiwan": {
+      "has_mine": true,
+      "has_plant": false,
       "silicon_export_rate": 0,
       "processing_capacity": 0
     }
