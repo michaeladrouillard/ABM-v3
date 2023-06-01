@@ -1,22 +1,38 @@
 {
     "CompanyAgent": {
-        "talent": [1, 10],
-        "resources": {
-            "money": 100,
-            "time": 100,
-            "people": 10
-        },
-        "cooperation_threshold": 15,
-        "project_launch_cost": 20,
-        "lobbying_government_talent_required": 5,
-        "compete_resources_percentage": 0.1,
-        "lobby_government_resource_gain": {
-            "money": [10, 20],
-            "time": [10, 20],
-            "people": [1, 2]
-        },
-        "anxiety_reduction_factor": 0.9,
-        "high_anxiety_threshold": 0.5,
-        "random_action_chance": 0.5
+      "talent_range": [1, 10],
+      "initial_resources": {
+        "money": 100,
+        "chips": 50
+      },
+      "cooperation_thresholds": {
+        "money": 30,
+        "chips": 30
+      },
+      "project_launch_cost": 30,
+      "project_launch_threshold": 20,
+      "government_lobby_money_threshold": 50,
+      "government_lobby_talent_threshold": 5,
+      "competition_percentage": 0.1
+    },
+    "CountryAgent": {
+      "initial_resources": {
+        "money": 100,
+        "chips": 50,
+        "silicon": 0
+      },
+      "sanctions_cost": 30,
+      "sanctions_percentage": 0.2,
+      "cooperation_thresholds": {
+        "money": 30,
+        "chips": 30
+      },
+      "decision_thresholds": {
+        "money": [30, 60],
+        "chips": [20, 30],
+        "anxiety_score": [7],
+        "gdp": [5]
+      }
     }
-}
+  }
+  

@@ -8,7 +8,7 @@ class CompanyAgent(Agent):
         super().__init__(unique_id, model)
 
         # Load JSON file
-        with open('agent_config.json') as json_file:
+        with open('Agents/agent_config.json') as json_file:
             data = json.load(json_file)
 
         company_data = data["CompanyAgent"]
@@ -119,7 +119,7 @@ class CountryAgent(Agent):
         super().__init__(unique_id, model)
 
         # Load JSON file
-        with open('agent_config.json') as json_file:
+        with open('Agents/agent_config.json') as json_file:
             data = json.load(json_file)
 
         country_data = data["CountryAgent"]

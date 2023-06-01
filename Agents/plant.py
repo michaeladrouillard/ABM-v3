@@ -18,5 +18,12 @@ class ProcessingPlantAgent(Agent):
     def receive_resources(self, amount):
         self.resources["silicon"] += amount
     
+    def receive_message(self, message):   
+        if "More Money" in message:
+            self.anxiety_score += self.model.communication_channels["Twitter"].distortion if "Twitter" in message else self.model.communication_channels["Press Conference"].distortion
+        elif "Less Money" in message:
+            self.anxiety_score -= self.model.communication_channels["Twitter"].distortion if "Twitter" in message else self.model.communication_channels["Press Conference"].distortion
+
+
     def step(self):
         self.process()
