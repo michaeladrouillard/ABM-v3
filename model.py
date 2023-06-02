@@ -11,10 +11,10 @@ from mesa.datacollection import DataCollector
 import random
 import numpy as np
 import networkx as nx
-import json
+import yaml
 
 class GameModel(Model):
-    def __init__(self, N, config_file='config.json'):
+    def __init__(self, N, config_file='config.yaml'):
         self.communication_channels = {"Press Conference": CommunicationChannel("Press Conference", 0.1),
                                         "Twitter": CommunicationChannel("Twitter", 0.5)}
         self.num_agents = N
@@ -29,8 +29,8 @@ class GameModel(Model):
         agent_id = 0
         for i, country in enumerate(countries[:N]):  # Use the first N countries from the shuffled list
             country_config = self.config["countries"].get(country, {})
-            has_mine = country_config.pop('has_mine', False)
-            has_plant = country_config.pop('has_plant', False)
+            num_mines = country_config.pop('mines', 0)
+            num_plants = country_config.pop('plants', 0)
             country_agent = CountryAgent(agent_id, self, country, **country_config)
             agent_id += 1  # Increment the agent ID
             company = self.company_affiliations[country]
@@ -40,11 +40,11 @@ class GameModel(Model):
             self.schedule.add(country_agent)
             self.schedule.add(company_agent)
 
-            if has_mine:
+            for _ in range(num_mines):
                 mine_agent = MineAgent(agent_id, self, country_agent)
                 self.schedule.add(mine_agent)
                 agent_id += 1  # Increment the agent ID
-            if has_plant:
+            for _ in range(num_plants):
                 processing_plant_agent = ProcessingPlantAgent(agent_id, self, country_agent)
                 self.schedule.add(processing_plant_agent)
                 agent_id += 1  # Increment the agent ID
@@ -70,13 +70,13 @@ class GameModel(Model):
                              "Chips": lambda a: a.resources["chips"],
                              "Talent": lambda a: a.talent if isinstance(a, CompanyAgent) else None,
                              #"Country": lambda a: a.get_country() if isinstance(a, CompanyAgent) else a.country,
-                             "Anxiety Level": lambda a: a.anxiety_score if isinstance(a, CountryAgent) else None,
+                             "Public Opinion": lambda a: a.public_opinion if isinstance(a, CountryAgent) else None,
                               "Capabilities Score": lambda a: a.capabilities_score if isinstance(a, CompanyAgent) else None})
 
     def check_invasion_condition(self):
         for agent in self.schedule.agents:
             if isinstance(agent, CountryAgent) and agent.country == "China":
-                self.invasion_probability = max(0, 1 - agent.anxiety_score / 10)
+                self.invasion_probability = max(0, 1 - agent.public_opinion / 10)
                 break
     def get_agent_by_id(self, unique_id):
       """Get an agent by its unique_id."""
@@ -85,9 +85,10 @@ class GameModel(Model):
             return agent
       return None  # No agent found
     
+  
     def load_config(self, config_file):
         with open(config_file, 'r') as f:
-            return json.load(f)
+            return yaml.safe_load(f)
     
     def step(self):
       '''Advance the model by one step.'''

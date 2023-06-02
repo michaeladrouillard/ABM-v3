@@ -1,18 +1,18 @@
 import random
 from mesa import Agent
 from mesa.time import RandomActivation
-import json
+import yaml
 
 class MineAgent(Agent):
     def __init__(self, unique_id, model, country_agent):
         super().__init__(unique_id, model)
         self.country_agent = country_agent
         self.country = country_agent.country 
-        self.anxiety_score  = 0
+        self.public_opinion  = 0
 
-        # Load JSON file
-        with open('Agents/agent_config.json') as json_file:
-            data = json.load(json_file)
+        # Load yaml file
+        with open('Agents/agent_config.yaml') as yaml_file:
+            data = yaml.safe_load(yaml_file)
 
         mine_data = data["MineAgent"]
 
@@ -35,9 +35,9 @@ class MineAgent(Agent):
         
     def receive_message(self, message):   
         if "More Money" in message:
-            self.anxiety_score += self.model.communication_channels["Twitter"].distortion if "Twitter" in message else self.model.communication_channels["Press Conference"].distortion
+            self.public_opinion += self.model.communication_channels["Twitter"].distortion if "Twitter" in message else self.model.communication_channels["Press Conference"].distortion
         elif "Less Money" in message:
-            self.anxiety_score -= self.model.communication_channels["Twitter"].distortion if "Twitter" in message else self.model.communication_channels["Press Conference"].distortion
+            self.public_opinion -= self.model.communication_channels["Twitter"].distortion if "Twitter" in message else self.model.communication_channels["Press Conference"].distortion
 
 
     def step(self):

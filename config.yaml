@@ -1,43 +1,32 @@
-{
-  "resource_transfer": {
-    "China": {
-      "Japan": {
-        "silicon": 10
-      }
-    }
-  },
-  "countries": {
-    "China": {
-      "has_mine": true,
-      "has_plant": false,
-      "silicon_export_rate": 0.8, 
-      "processing_capacity": 0.2
-    },
-    "Japan": {
-      "has_mine": true,
-      "has_plant": true,
-      "silicon_export_rate": 0.1,
-      "processing_capacity": 0.9
-    },
-    "US": {
-      "has_mine": true,
-      "has_plant": false,
-      "silicon_export_rate": 0,
-      "processing_capacity": 0
-    },
-    "EU": {
-      "has_mine": true,
-      "has_plant": false,
-      "silicon_export_rate": 0,
-      "processing_capacity": 0
-    },
-    "Taiwan": {
-      "has_mine": true,
-      "has_plant": false,
-      "silicon_export_rate": 0,
-      "processing_capacity": 0
-    }
-  }
-}
+resource_transfer: 
+  China: 
+    Japan: 
+      silicon: 10
+countries: 
+  China: 
+    mines: 10
+    plants: 0
+    silicon_export_rate: 0.8
+    processing_capacity: 0.2
+  Japan: 
+    mines: 2
+    plants: 10
+    silicon_export_rate: 0.1
+    processing_capacity: 0.9
+  US: 
+    mines: 4
+    plants: 1
+    silicon_export_rate: 0
+    processing_capacity: 0
+  EU: 
+    mines: 4
+    plants: 4
+    silicon_export_rate: 0
+    processing_capacity: 0
+  Taiwan: 
+    mines: 1
+    plants: 1
+    silicon_export_rate: 0
+    processing_capacity: 0
 
   

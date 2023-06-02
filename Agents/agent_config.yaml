@@ -1,56 +1,42 @@
-{
-    "CompanyAgent": {
-      "talent_range": [1, 10],
-      "initial_resources": {
-        "money": 100,
-        "chips": 50
-      },
-      "cooperation_thresholds": {
-        "money": 30,
-        "chips": 30
-      },
-      "project_launch_cost": 30,
-      "project_launch_threshold": 20,
-      "government_lobby_money_threshold": 50,
-      "government_lobby_talent_threshold": 5,
-      "competition_percentage": 0.1
-    },
-    "CountryAgent": {
-      "initial_resources": {
-        "money": 100,
-        "chips": 50,
-        "silicon": 0
-      },
-      "sanctions_cost": 30,
-      "sanctions_percentage": 0.2,
-      "alliance_cost": 20,
-      "alliance_gain": 10,
-      "research_investment_cost": 15,
-      "research_capacity_gain": 10,
-      "cooperation_thresholds": {
-        "money": 30,
-        "chips": 30
-      },
-      "decision_thresholds": {
-        "money": [30, 60],
-        "chips": [20, 30],
-        "anxiety_score": [7],
-        "gdp": [5]
-      }
-    },
-    "MineAgent": {
-      "initial_resources": {
-        "silicon": 100,
-        "money": 50,
-        "chips": 0
-      }
-    },
-    "ProcessingPlantAgent": {
-      "initial_resources": {
-        "chips": 50,
-        "money": 50,
-        "silicon": 0
-      }
-    }
-  }
-  
+CompanyAgent: 
+  talent_range: [1, 10]
+  initial_resources: 
+    money: 100
+    chips: 50
+  cooperation_thresholds: 
+    money: 30
+    chips: 30
+  project_launch_cost: 30
+  project_launch_threshold: 20
+  government_lobby_money_threshold: 50
+  government_lobby_talent_threshold: 5
+  competition_percentage: 0.1
+CountryAgent: 
+  initial_resources: 
+    money: 100
+    chips: 50
+    silicon: 0
+  sanctions_cost: 30
+  sanctions_percentage: 0.2
+  alliance_cost: 20
+  alliance_gain: 10
+  research_investment_cost: 15
+  research_capacity_gain: 10
+  cooperation_thresholds: 
+    money: 30
+    chips: 30
+  decision_thresholds: 
+    money: [30, 60]
+    chips: [20, 30]
+    anxiety_score: [7]
+    gdp: [5]
+MineAgent: 
+  initial_resources: 
+    silicon: 100
+    money: 50
+    chips: 0
+ProcessingPlantAgent: 
+  initial_resources: 
+    chips: 50
+    money: 50
+    silicon: 0

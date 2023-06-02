@@ -1,15 +1,15 @@
 import random
 from mesa import Agent
 from mesa.time import RandomActivation
-import json
+import yaml
 
 class CompanyAgent(Agent):
     def __init__(self, unique_id, model, country_agent, company_name):
         super().__init__(unique_id, model)
 
-        # Load JSON file
-        with open('Agents/agent_config.json') as json_file:
-            data = json.load(json_file)
+        # Load yaml file
+        with open('Agents/agent_config.yaml') as yaml_file:
+            data = yaml.safe_load(yaml_file)
 
         company_data = data["CompanyAgent"]
 
@@ -19,7 +19,7 @@ class CompanyAgent(Agent):
         self.country_agent = country_agent 
         self.company_name = company_name  
         self.capabilities_score = 0
-        self.anxiety_score = 0
+        self.public_opinion = 0
 
         self.project_launch_threshold = company_data["project_launch_threshold"]
         self.government_lobby_money_threshold = company_data["government_lobby_money_threshold"]
@@ -42,8 +42,8 @@ class CompanyAgent(Agent):
             other_agent.resources["chips"] -= self.cooperation_thresholds["chips"]
 
             # Decrease anxiety score due to successful cooperation
-            self.anxiety_score -= 1
-            other_agent.anxiety_score -= 1
+            self.public_opinion -= 1
+            other_agent.public_opinion -= 1
 
             return True  # Cooperation was successful
         else:
@@ -53,27 +53,27 @@ class CompanyAgent(Agent):
     def receive_message(self, message):   
       # A simple example of receiving a message: change anxiety level based on the message content
         if "High Money" in message or "Very High Money" in message or "High Chips" in message or "Very High Chips" in message:
-            self.anxiety_score -= 1
+            self.public_opinion -= 1
         elif "Low Chips" in message or "Low Money" in message:
-            self.anxiety_score += 1
+            self.public_opinion += 1
 
     def launch_project(self):
         if self.resources["money"] >= self.project_launch_cost:  # Assuming launching a project requires 30 money
             self.resources["money"] -= self.project_launch_cost
             self.increase_capabilities()  # Launching a project increases capabilities
 
-            # This decreases the country's level. Decrease own anxiety level, using a percentage decrease for demonstration
-            self.country_agent.anxiety_score *= 0.9
-            self.anxiety_score *= 0.9
+            # This decreases the country's level. Decrease own public opinion level, using a percentage decrease for demonstration
+            self.country_agent.public_opinion *= 0.9
+            self.public_opinion *= 0.9
             # Increase anxiety level of other agents
             for agent in self.model.schedule.agents:
                 if isinstance(agent, CountryAgent) and agent.unique_id != self.unique_id + 1:
-                    agent.anxiety_score += self.capabilities_score * 0.01  # Using capabilities score as a factor
+                    agent.public_opinion += self.capabilities_score * 0.01  # Using capabilities score as a factor
             return True  # Successfully launched project
         else:
-            # Increase own anxiety level and country level if project fails
-            self.country_agent.anxiety_score += 1
-            self.anxiety_score += 1 
+            # Increase own PO and country level if project fails
+            self.country_agent.public_opinion += 1
+            self.public_opinion += 1 
             return False  # Failed to launch project due to insufficient money
        
 
@@ -162,15 +162,16 @@ class CountryAgent(Agent):
     def __init__(self, unique_id, model, country, silicon_export_rate=0, processing_capacity=0):
         super().__init__(unique_id, model)
 
-        # Load JSON file
-        with open('Agents/agent_config.json') as json_file:
-            data = json.load(json_file)
+        # Load yaml file
+        with open('Agents/agent_config.yaml') as yaml_file:
+            data = yaml.safe_load(yaml_file)
+
 
         country_data = data["CountryAgent"]
 
         self.resources = country_data["initial_resources"].copy() 
         self.country = country  # Country the agent belongs to
-        self.anxiety_score = 0  # The anxiety level of the agent
+        self.public_opinion = 0  # The anxiety level of the agent
         self.company = None  # The CompanyAgent associated with this country, initialized to None
         self.debt = 0
         self.gdp = 0  # Initialize GDP to 0
@@ -222,9 +223,9 @@ class CountryAgent(Agent):
   
     def receive_message(self, message):   
         if "More Money" in message:
-            self.anxiety_score += self.model.communication_channels["Twitter"].distortion if "Twitter" in message else self.model.communication_channels["Press Conference"].distortion
+            self.public_opinion += self.model.communication_channels["Twitter"].distortion if "Twitter" in message else self.model.communication_channels["Press Conference"].distortion
         elif "Less Money" in message:
-            self.anxiety_score -= self.model.communication_channels["Twitter"].distortion if "Twitter" in message else self.model.communication_channels["Press Conference"].distortion
+            self.public_opinion -= self.model.communication_channels["Twitter"].distortion if "Twitter" in message else self.model.communication_channels["Press Conference"].distortion
 
 
     def evaluate_message_content(self, message_type):
