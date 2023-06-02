@@ -48,6 +48,20 @@ class GameModel(Model):
                 processing_plant_agent = ProcessingPlantAgent(agent_id, self, country_agent)
                 self.schedule.add(processing_plant_agent)
                 agent_id += 1  # Increment the agent ID
+        additional_companies = self.config["additional_companies"]  # Load the number of additional companies from the yaml file
+        for _ in range(additional_companies):
+            country_agent = random.choice(self.schedule.agents)  # Choose a random country agent
+            company_name = f"Company_{agent_id}"  # Generate a unique company name based on the agent ID
+            company_agent = CompanyAgent(agent_id, self, country_agent, company_name)
+            agent_id += 1  # Increment the agent ID
+
+            # Randomize the company's resources and talent
+            company_agent.resources["money"] = random.randint(*self.config["CompanyAgent"]["money_range"])
+            company_agent.resources["chips"] = random.randint(*self.config["CompanyAgent"]["chips_range"])
+            company_agent.talent = random.randint(*self.config["CompanyAgent"]["talent_range"])
+
+            self.schedule.add(company_agent)  # Add the company agent to the schedule
+
 
         # Create a random network of agents
         G = nx.erdos_renyi_graph(n=self.num_agents, p=0.1)

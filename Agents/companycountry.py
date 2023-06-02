@@ -27,14 +27,14 @@ class CompanyAgent(Agent):
         self.project_launch_cost = company_data["project_launch_cost"]
         self.government_lobby_talent_threshold = company_data["government_lobby_talent_threshold"]
         self.competition_percentage = company_data["competition_percentage"]
-
+        #print(f'Created CompanyAgent with id {self.unique_id}')
 
     def get_country(self):
         return self.country_agent.country
 
     def increase_capabilities(self):
       #increase capabilities score
-      self.capabilities_score += 1
+      self.capabilities_score += self.resources["chips"] * 0.1
 
     def cooperate_with(self, other_agent):
         if (self.resources["money"] > self.cooperation_thresholds["money"] and self.cooperation_thresholds["chips"]):
@@ -96,9 +96,10 @@ class CompanyAgent(Agent):
 
 
     def expected_gain_launch_project(self):
-        # Assume that the expected gain from launching a project is proportional to the capabilities score
+            # Assume that the expected gain from launching a project is proportional to the capabilities score
+         # and the number of chips
         if self.resources["money"] >= self.project_launch_cost:
-            return self.capabilities_score * 2  # The number 2 is arbitrary and can be adjusted
+            return self.capabilities_score * 2 + self.resources["chips"]
         else:
             return 0
 
@@ -155,6 +156,7 @@ class CompanyAgent(Agent):
 
 
     def step(self):
+        #print(f'Step function called for agent {self.unique_id}')
         self.choose_action()
 
 

@@ -28,5 +28,8 @@ countries:
     plants: 1
     silicon_export_rate: 0
     processing_capacity: 0
-
-  
+additional_companies: 10000
+CompanyAgent:
+  money_range: [100, 1000]
+  chips_range: [100, 1000]
+  talent_range: [1, 10]

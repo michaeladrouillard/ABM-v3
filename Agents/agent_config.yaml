@@ -6,8 +6,8 @@ CompanyAgent:
   cooperation_thresholds: 
     money: 30
     chips: 30
-  project_launch_cost: 30
-  project_launch_threshold: 20
+  project_launch_cost: 10
+  project_launch_threshold: 10
   government_lobby_money_threshold: 50
   government_lobby_talent_threshold: 5
   competition_percentage: 0.1
