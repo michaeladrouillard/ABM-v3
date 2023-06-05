@@ -1,5 +1,6 @@
 CompanyAgent: 
   talent_range: [1, 10]
+  influence: 1
   initial_resources: 
     money: 100
     chips: 50

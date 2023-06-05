@@ -15,12 +15,13 @@ class CompanyAgent(Agent):
 
         self.talent = random.randint(*company_data["talent_range"]) 
         self.resources = company_data["initial_resources"].copy()
-        
+        self.prev_resources = self.resources.copy() 
         self.country_agent = country_agent 
         self.company_name = company_name  
         self.capabilities_score = 0
         self.public_opinion = 0
-
+        
+        self.influence = company_data["influence"]
         self.project_launch_threshold = company_data["project_launch_threshold"]
         self.government_lobby_money_threshold = company_data["government_lobby_money_threshold"]
         self.cooperation_thresholds = company_data["cooperation_thresholds"]
@@ -50,21 +51,39 @@ class CompanyAgent(Agent):
             return False  # Cooperation failed due to insufficient resources
 
     def send_private_message(self, message, receiver):
-        # Sends a private message without 
+     # Sends a private message without distortion
         message_content = self.evaluate_message_content(message)
-        receiver.receive_message(message)
+        receiver.receive_message(message_content, self)
 
-    def send_public_message(self, message, channel):
-        distorted_message = self.model.communication_channels[channel].distort_message(message)
-        for agent in self.model.schedule.agents: 
-            agent.receive_message(distorted_message)
 
-    def receive_message(self, message):   
+ #   def send_public_message(self, message, channel):
+ #       message_content = self.evaluate_message_content(message)
+ #       distorted_message = self.model.communication_channels[channel].distort_message(message_content)
+ #       for agent in self.model.schedule.agents: 
+ #           agent.receive_message(distorted_message, self)
+
+def send_public_message(self, message, channel):
+    message_content = self.evaluate_message_content(message)
+    distorted_message = self.model.communication_channels[channel].distort_message(message_content)
+    for agent in self.model.schedule.agents: 
+        if hasattr(agent, "receive_message"):
+            if callable(getattr(agent, "receive_message")):
+                num_args = agent.receive_message.__code__.co_argcount
+                if num_args == 2:
+                    agent.receive_message(distorted_message, self)
+                else:
+                    print(f"Agent of type {type(agent)} has a receive_message function with {num_args} arguments, but 2 were expected.")
+        else:
+            print(f"Agent of type {type(agent)} does not have a receive_message method.")
+
+
+    def receive_message(self, message, sender):   
       # A simple example of receiving a message: change anxiety level based on the message content
+        influence_factor = sender.influence if isinstance(sender, CompanyAgent) else 1
         if "High Money" in message or "Very High Money" in message or "High Chips" in message or "Very High Chips" in message:
-            self.public_opinion -= 1
+            self.public_opinion -= 1 * influence_factor
         elif "Low Chips" in message or "Low Money" in message:
-            self.public_opinion += 1
+            self.public_opinion += 1 * influence_factor
 
     def evaluate_message_content(self, message_type):
         """Evaluate message content based on the message type and changes in resources."""
@@ -98,11 +117,16 @@ class CompanyAgent(Agent):
             for agent in self.model.schedule.agents:
                 if isinstance(agent, CountryAgent) and agent.unique_id != self.unique_id + 1:
                     agent.public_opinion += self.capabilities_score * 0.01  # Using capabilities score as a factor
+            for channel in self.model.communication_channels.keys():
+                self.send_public_message(self.evaluate_message_content('money'), channel)
             return True  # Successfully launched project
         else:
             # Increase own PO and country level if project fails
             self.country_agent.public_opinion += 1
             self.public_opinion += 1 
+            for channel in self.model.communication_channels.keys():
+                self.send_public_message(self.evaluate_message_content('money'), channel)
+
             return False  # Failed to launch project due to insufficient money
        
 
@@ -111,7 +135,11 @@ class CompanyAgent(Agent):
             # Lobbying government might increase resources
             self.resources["money"] += random.randint(10, 20)  # Increase in money
             self.resources["chips"] += random.randint(5, 10)  # Increase in chips
+            for channel in self.model.communication_channels.keys():
+                self.send_public_message(self.evaluate_message_content('money'), channel)
             return True  # Successfully lobbied government
+        for channel in self.model.communication_channels.keys():
+            self.send_public_message(self.evaluate_message_content('money'), channel)
         return False  # Failed to lobby government due to insufficient talent
 
     def compete_with(self, other_company):
@@ -120,8 +148,14 @@ class CompanyAgent(Agent):
             # Winning company takes some resources from the losing company
             self.resources["money"] += other_company.resources["money"] * 0.1  # Takes 10% of other's money
             other_company.resources["money"] *= 0.9  # Loses 10% of money
+            for channel in self.model.communication_channels.keys():
+                self.send_public_message(self.evaluate_message_content('money'), channel)
             return True  # This company wins
+        for channel in self.model.communication_channels.keys():
+            self.send_public_message(self.evaluate_message_content('money'), channel)
         return False  # This company loses
+    
+        self.send_public_message(self.evaluate_message_content('money'))
 
 
     def expected_gain_launch_project(self):
@@ -296,7 +330,7 @@ class CountryAgent(Agent):
         # If there is a company affiliated with this country, they also benefit from the research investment
         if self.company:
             self.company.resources["money"] += self.research_capacity_gain
-        self.send_public_message(self.evaluate_message_content('money'), 'Twitter')  # Assume that this action is communicated via Twitter
+        self.send_public_message(self.evaluate_message_content('money')) 
 
     def expected_gain_invest_in_research(self):
         if self.resources["money"] > self.research_investment_cost:
@@ -343,7 +377,7 @@ class CountryAgent(Agent):
         # The other country also benefits from the alliance
         other.resources["money"] += self.alliance_gain
 
-        self.send_public_message(self.evaluate_message_content('money'), 'Press Conference')  # Assume that this action is communicated via Press Conference
+        self.send_public_message(self.evaluate_message_content('money')) 
 
         return True  # Successfully formed an alliance
 
