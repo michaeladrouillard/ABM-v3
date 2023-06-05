@@ -49,6 +49,15 @@ class CompanyAgent(Agent):
         else:
             return False  # Cooperation failed due to insufficient resources
 
+    def send_private_message(self, message, receiver):
+        # Sends a private message without 
+        message_content = self.evaluate_message_content(message)
+        receiver.receive_message(message)
+
+    def send_public_message(self, message, channel):
+        distorted_message = self.model.communication_channels[channel].distort_message(message)
+        for agent in self.model.schedule.agents: 
+            agent.receive_message(distorted_message)
 
     def receive_message(self, message):   
       # A simple example of receiving a message: change anxiety level based on the message content
@@ -56,6 +65,26 @@ class CompanyAgent(Agent):
             self.public_opinion -= 1
         elif "Low Chips" in message or "Low Money" in message:
             self.public_opinion += 1
+
+    def evaluate_message_content(self, message_type):
+        """Evaluate message content based on the message type and changes in resources."""
+        if message_type == 'money':
+            if self.resources['money'] > self.prev_resources['money']:
+                return 'More Money'
+            elif self.resources['money'] < self.prev_resources['money']:
+                return 'Less Money'
+            else:
+                return 'Same Money'
+        elif message_type == 'chips':
+            if self.resources['chips'] > self.prev_resources['chips']:
+                return 'More Chips'
+            elif self.resources['chips'] < self.prev_resources['chips']:
+                return 'Less Chips'
+            else:
+                return 'Same Chips'
+        else:
+            return ''
+
 
     def launch_project(self):
         if self.resources["money"] >= self.project_launch_cost:  # Assuming launching a project requires 30 money
