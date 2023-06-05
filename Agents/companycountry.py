@@ -307,7 +307,6 @@ class CountryAgent(Agent):
 
     def form_alliance(self, other):   
         """Form an alliance with another country and share the benefit."""
-
         # Form an alliance
         self.resources["money"] -= self.alliance_cost
         self.research_capacity += self.alliance_gain
