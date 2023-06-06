@@ -80,12 +80,7 @@ class GameModel(Model):
                             "Invasion Probability": lambda m: m.invasion_probability,
                             "Total Capabilities Growth Rate": compute_total_capabilities_growth_rate,
                             "GDP": lambda m: {agent.country: agent.calculate_gdp() for agent in m.schedule.agents if isinstance(agent, CountryAgent)}},
-            agent_reporters={"Money": lambda a: a.resources["money"], 
-                             "Chips": lambda a: a.resources["chips"],
-                             "Talent": lambda a: a.talent if isinstance(a, CompanyAgent) else None,
-                             #"Country": lambda a: a.get_country() if isinstance(a, CompanyAgent) else a.country,
-                             "Public Opinion": lambda a: a.public_opinion if isinstance(a, CountryAgent) else None,
-                              "Capabilities Score": lambda a: a.capabilities_score if isinstance(a, CompanyAgent) else None})
+            agent_reporters={"Agent Attributes": lambda a: a.__dict__,} )
 
     def check_invasion_condition(self):
         for agent in self.schedule.agents:
