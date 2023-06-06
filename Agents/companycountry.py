@@ -62,28 +62,35 @@ class CompanyAgent(Agent):
  #       for agent in self.model.schedule.agents: 
  #           agent.receive_message(distorted_message, self)
 
-def send_public_message(self, message, channel):
-    message_content = self.evaluate_message_content(message)
-    distorted_message = self.model.communication_channels[channel].distort_message(message_content)
-    for agent in self.model.schedule.agents: 
-        if hasattr(agent, "receive_message"):
-            if callable(getattr(agent, "receive_message")):
-                num_args = agent.receive_message.__code__.co_argcount
-                if num_args == 2:
-                    agent.receive_message(distorted_message, self)
-                else:
-                    print(f"Agent of type {type(agent)} has a receive_message function with {num_args} arguments, but 2 were expected.")
-        else:
-            print(f"Agent of type {type(agent)} does not have a receive_message method.")
+
+    def send_public_message(self, message_type):
+        message_content = self.evaluate_message_content(message_type)
+     # Iterate over all communication channels in the model
+        for channel in self.model.communication_channels.keys():
+            # Distort the message using the model's method
+            distorted_message = self.model.communication_channels[channel].distort_message(message_content)
+            # Send the distorted message to all agents
+            for agent in self.model.schedule.agents:
+                # Only send the message if the agent has a 'receive_message' method
+                if hasattr(agent, "receive_message") and callable(getattr(agent, "receive_message")):
+                    try:
+                        agent.receive_message(distorted_message, self)
+                    except TypeError:
+                    # The agent's receive_message method does not accept the correct arguments
+                        continue
 
 
-    def receive_message(self, message, sender):   
-      # A simple example of receiving a message: change anxiety level based on the message content
+  
+    def receive_message(self, message, sender):
+        # Calculate the influence factor. If the sender is a CompanyAgent, use its influence, otherwise use 1.
         influence_factor = sender.influence if isinstance(sender, CompanyAgent) else 1
-        if "High Money" in message or "Very High Money" in message or "High Chips" in message or "Very High Chips" in message:
+
+        # Update public opinion score based on the message content
+        if "More Money" in message or "More Chips" in message:
             self.public_opinion -= 1 * influence_factor
-        elif "Low Chips" in message or "Low Money" in message:
+        elif "Less Money" in message or "Less Chips" in message:
             self.public_opinion += 1 * influence_factor
+
 
     def evaluate_message_content(self, message_type):
         """Evaluate message content based on the message type and changes in resources."""
@@ -118,14 +125,14 @@ def send_public_message(self, message, channel):
                 if isinstance(agent, CountryAgent) and agent.unique_id != self.unique_id + 1:
                     agent.public_opinion += self.capabilities_score * 0.01  # Using capabilities score as a factor
             for channel in self.model.communication_channels.keys():
-                self.send_public_message(self.evaluate_message_content('money'), channel)
+                self.send_public_message(self.evaluate_message_content('money'))
             return True  # Successfully launched project
         else:
             # Increase own PO and country level if project fails
             self.country_agent.public_opinion += 1
             self.public_opinion += 1 
             for channel in self.model.communication_channels.keys():
-                self.send_public_message(self.evaluate_message_content('money'), channel)
+                self.send_public_message(self.evaluate_message_content('money'))
 
             return False  # Failed to launch project due to insufficient money
        
@@ -136,10 +143,10 @@ def send_public_message(self, message, channel):
             self.resources["money"] += random.randint(10, 20)  # Increase in money
             self.resources["chips"] += random.randint(5, 10)  # Increase in chips
             for channel in self.model.communication_channels.keys():
-                self.send_public_message(self.evaluate_message_content('money'), channel)
+                self.send_public_message(self.evaluate_message_content('money'))
             return True  # Successfully lobbied government
         for channel in self.model.communication_channels.keys():
-            self.send_public_message(self.evaluate_message_content('money'), channel)
+            self.send_public_message(self.evaluate_message_content('money'))
         return False  # Failed to lobby government due to insufficient talent
 
     def compete_with(self, other_company):
@@ -149,10 +156,10 @@ def send_public_message(self, message, channel):
             self.resources["money"] += other_company.resources["money"] * 0.1  # Takes 10% of other's money
             other_company.resources["money"] *= 0.9  # Loses 10% of money
             for channel in self.model.communication_channels.keys():
-                self.send_public_message(self.evaluate_message_content('money'), channel)
+                self.send_public_message(self.evaluate_message_content('money'))
             return True  # This company wins
         for channel in self.model.communication_channels.keys():
-            self.send_public_message(self.evaluate_message_content('money'), channel)
+            self.send_public_message(self.evaluate_message_content('money'))
         return False  # This company loses
     
         self.send_public_message(self.evaluate_message_content('money'))
@@ -279,18 +286,35 @@ class CountryAgent(Agent):
     def send_private_message(self, message, receiver):
         # Sends a private message without 
         message_content = self.evaluate_message_content(message)
-        receiver.receive_message(message)
+        receiver.receive_message(message_content, self)
 
-    def send_public_message(self, message, channel):
-        distorted_message = self.model.communication_channels[channel].distort_message(message)
-        for agent in self.model.schedule.agents: 
-            agent.receive_message(distorted_message)
+    def send_public_message(self, message_type):    
+        message_content = self.evaluate_message_content(message_type)
+        # Iterate over all communication channels in the model
+        for channel in self.model.communication_channels.keys():
+        # Distort the message using the model's method
+            distorted_message = self.model.communication_channels[channel].distort_message(message_content)
+            # Send the distorted message to all agents
+            for agent in self.model.schedule.agents:
+                # Only send the message if the agent has a 'receive_message' method
+                if hasattr(agent, "receive_message") and callable(getattr(agent, "receive_message")):
+                    try:
+                        agent.receive_message(distorted_message, self)
+                    except TypeError:
+                        # The agent's receive_message method does not accept the correct arguments
+                        continue
+
+
   
-    def receive_message(self, message):   
-        if "More Money" in message:
-            self.public_opinion += self.model.communication_channels["Twitter"].distortion if "Twitter" in message else self.model.communication_channels["Press Conference"].distortion
-        elif "Less Money" in message:
-            self.public_opinion -= self.model.communication_channels["Twitter"].distortion if "Twitter" in message else self.model.communication_channels["Press Conference"].distortion
+    def receive_message(self, message, sender):
+        # Calculate the influence factor. If the sender is a CompanyAgent, use its influence, otherwise use 1.
+        influence_factor = sender.influence if isinstance(sender, CompanyAgent) else 1
+
+        # Update public opinion score based on the message content
+        if "More Money" in message or "More Chips" in message:
+            self.public_opinion -= 1 * influence_factor
+        elif "Less Money" in message or "Less Chips" in message:
+            self.public_opinion += 1 * influence_factor
 
 
     def evaluate_message_content(self, message_type):
@@ -319,8 +343,12 @@ class CountryAgent(Agent):
           self.resources["money"] -= self.sanctions_cost #pay for the sanctions
           # ^ does this make sense?
           other.resources["money"] -= other.resources["money"] * self.sanctions_percentage  # Other agent loses 20% of money
+          for channel in self.model.communication_channels.keys():
+            self.send_public_message(self.evaluate_message_content('money'))
           return True #succesfully imposed sanctions
       else:
+          for channel in self.model.communication_channels.keys():
+            self.send_public_message(self.evaluate_message_content('money'))
           return False #failed to impose sanctions
 
     def invest_in_research(self):
