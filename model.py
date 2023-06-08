@@ -3,6 +3,9 @@ from Agents.communication import *
 from Agents.resource import *
 from Agents.mine import *
 from Agents.plant import *
+from Agents.nvidia import *
+from Agents.tsmc import *
+
 
 import random
 from mesa import Agent, Model
@@ -27,18 +30,33 @@ class GameModel(Model):
         countries = ["US", "China", "EU", "Japan", "Taiwan"]
         random.shuffle(countries)  # Shuffle the list to add randomness
         agent_id = 0
+
+        tsmc = None 
+        
         for i, country in enumerate(countries[:N]):  # Use the first N countries from the shuffled list
             country_config = self.config["countries"].get(country, {})
             num_mines = country_config.pop('mines', 0)
             num_plants = country_config.pop('plants', 0)
             country_agent = CountryAgent(agent_id, self, country, **country_config)
             agent_id += 1  # Increment the agent ID
-            company = self.company_affiliations[country]
-            company_agent = CompanyAgent(agent_id, self, country_agent, company)
-            agent_id += 1  # Increment the agent ID
-            country_agent.set_company(company_agent)
-            self.schedule.add(country_agent)
-            self.schedule.add(company_agent)
+        # Create specific company agents based on the country
+    # Create specific company agents based on the country
+            if country == "Taiwan":
+                company_agent = TSMC(agent_id, self, country_agent) # Removed company from the arguments
+                agent_id += 1  
+                tsmc = company_agent  # Store a reference to the TSMC instance
+
+            elif country == "US" and tsmc is not None:  # Only create Nvidia agent if tsmc has been defined
+                company_agent = Nvidia(agent_id, self, country_agent, tsmc) # Removed company from the arguments
+                agent_id += 1 
+
+            else:  # For other countries, use the existing way to create companies
+                company = self.company_affiliations[country]
+                company_agent = CompanyAgent(agent_id, self, country_agent, company)
+                agent_id += 1  
+                country_agent.set_company(company_agent)
+                self.schedule.add(country_agent)
+                self.schedule.add(company_agent)
 
             for _ in range(num_mines):
                 mine_agent = MineAgent(agent_id, self, country_agent)
