@@ -30,16 +30,9 @@ class Nvidia(CompanyAgent):
             # Assume R&D increases the company's capabilities
             self.capabilities_score += 100
 
-    def form_partnership(self, other_company):
-        # Forming a partnership with TSMC
-        if isinstance(other_company, tsmc):
-            self.resources["money"] -= 5000  # Assume forming a partnership costs some money
-            self.partner_company = other_company  # Store the partner company
+    # def form_partnership(self, other_company):
+    #     # Forming a partnership with TSMC
+    #     if isinstance(other_company, tsmc):
+    #         self.resources["money"] -= 5000  # Assume forming a partnership costs some money
+    #         self.partner_company = other_company  # Store the partner company
 
-    def order_chip_production(self, number_of_chips):
-        # Order chip production from TSMC
-        if hasattr(self, "partner_company") and isinstance(self.partner_company, tsmc):
-            cost = self.partner_company.produce_chips(number_of_chips)
-            if self.resources["money"] >= cost:
-                self.resources["money"] -= cost
-                self.resources["chips"] += number_of_chips

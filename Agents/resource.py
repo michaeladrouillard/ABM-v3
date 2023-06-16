@@ -4,7 +4,7 @@ from mesa.time import RandomActivation
 
 #Define the Resource class
 class Resource:
-  def __init__(self, name):
+  def __init__(self, name, model):
     self.name = name
     #self.quantity = quantity
     #initialize other parameters for Resource here

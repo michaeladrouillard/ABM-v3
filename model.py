@@ -1,10 +1,10 @@
-from Agents.companycountry import *
-from Agents.communication import *
-from Agents.resource import *
-from Agents.mine import *
-from Agents.plant import *
-from Agents.nvidia import *
-from Agents.tsmc import *
+from Agents.companycountry import CountryAgent, CompanyAgent, NvidiaAgent, SMICAgent, InfineonAgent, RenesasAgent, TSMCAgent
+from Agents.communication import CommunicationChannel
+from Agents.resource import Resource
+from Agents.mine import MineAgent
+from Agents.plant import ProcessingPlantAgent
+
+
 
 
 import random
@@ -18,46 +18,55 @@ import yaml
 
 class GameModel(Model):
     def __init__(self, N, config_file='config.yaml'):
-        self.communication_channels = {"Press Conference": CommunicationChannel("Press Conference", 0.1),
-                                        "Twitter": CommunicationChannel("Twitter", 0.5)}
+        """
+        Initializing an instance of the Game Model class.
+        N is the number of agents (determined in main).
+        config_file is the path to the YAML configuration."""
+        #Define communication channels
+        self.communication_channels = {"Press Conference": CommunicationChannel("Press Conference", 0.1, self),
+                                        "Twitter": CommunicationChannel("Twitter", 0.5, self)}
         self.num_agents = N
+        #Creating a schedule using Mesa's RandomActivation
         self.schedule = RandomActivation(self)
+        #Initializing the flags and counters of the main risk we're investigating
         self.china_invades_taiwan = False #indicator of war
         self.invasion_probability = 0 #probability of invasion
+        #Loading in the YAML configurations
         self.company_affiliations = {"US": "Nvidia", "China": "SMIC", "EU": "Infineon", "Japan": "Renesas", "Taiwan": "TSMC"}  # Company affiliations
         self.config = self.load_config(config_file)
-        #Create agents
+        self.company_class_mapping = {
+    "Nvidia": NvidiaAgent,
+    "SMIC": SMICAgent,
+    "Infineon": InfineonAgent,
+    "Renesas": RenesasAgent,
+    "TSMC": TSMCAgent,
+}
+
+  #Create agents
         countries = ["US", "China", "EU", "Japan", "Taiwan"]
         random.shuffle(countries)  # Shuffle the list to add randomness
         agent_id = 0
 
-        tsmc = None 
         
-        for i, country in enumerate(countries[:N]):  # Use the first N countries from the shuffled list
+        # Loop over each country and its corresponding list of companies from the YAML file
+        for country, companies in self.config["company_country_map"].items():
             country_config = self.config["countries"].get(country, {})
             num_mines = country_config.pop('mines', 0)
             num_plants = country_config.pop('plants', 0)
+
+            # Create a CountryAgent for each country
             country_agent = CountryAgent(agent_id, self, country, **country_config)
             agent_id += 1  # Increment the agent ID
-        # Create specific company agents based on the country
-    # Create specific company agents based on the country
-            if country == "Taiwan":
-                company_agent = TSMC(agent_id, self, country_agent) # Removed company from the arguments
-                agent_id += 1  
-                tsmc = company_agent  # Store a reference to the TSMC instance
-
-            elif country == "US" and tsmc is not None:  # Only create Nvidia agent if tsmc has been defined
-                company_agent = Nvidia(agent_id, self, country_agent, tsmc) # Removed company from the arguments
-                agent_id += 1 
-
-            else:  # For other countries, use the existing way to create companies
-                company = self.company_affiliations[country]
-                company_agent = CompanyAgent(agent_id, self, country_agent, company)
+            
+            self.schedule.add(country_agent)
+            for company in companies:
+                CompanyAgentClass = self.company_class_mapping.get(company, CompanyAgent)
+                company_agent = CompanyAgentClass(agent_id, self, country_agent, company)
                 agent_id += 1  
                 country_agent.set_company(company_agent)
-                self.schedule.add(country_agent)
                 self.schedule.add(company_agent)
 
+            # Creating Mines and Plants as previously in your code
             for _ in range(num_mines):
                 mine_agent = MineAgent(agent_id, self, country_agent)
                 self.schedule.add(mine_agent)
@@ -66,6 +75,7 @@ class GameModel(Model):
                 processing_plant_agent = ProcessingPlantAgent(agent_id, self, country_agent)
                 self.schedule.add(processing_plant_agent)
                 agent_id += 1  # Increment the agent ID
+
         additional_companies = self.config["additional_companies"]  # Load the number of additional companies from the yaml file
         for _ in range(additional_companies):
             country_agent = random.choice(self.schedule.agents)  # Choose a random country agent
@@ -80,15 +90,9 @@ class GameModel(Model):
 
             self.schedule.add(company_agent)  # Add the company agent to the schedule
 
-
-        # Create a random network of agents
+    # Create a random network of agents
         G = nx.erdos_renyi_graph(n=self.num_agents, p=0.1)
         self.network = nx.relabel_nodes(G, dict(zip(range(self.num_agents), self.schedule.agents)))
-
-        #Update compute_total_capabilities_growth_rate function
-        def compute_total_capabilities_growth_rate(model):
-            total_growth_rate = sum(a.capabilities_score for a in model.schedule.agents if isinstance(a, CompanyAgent))
-            return total_growth_rate
 
         #Initialize a data collector
         self.datacollector = DataCollector(
@@ -96,11 +100,19 @@ class GameModel(Model):
                             "Total Chips": lambda m: sum(a.resources["chips"] for a in m.schedule.agents),
                             "China Invades Taiwan": lambda m: m.china_invades_taiwan,
                             "Invasion Probability": lambda m: m.invasion_probability,
-                            "Total Capabilities Growth Rate": compute_total_capabilities_growth_rate,
+                            "Total Capabilities Growth Rate": lambda m: sum(a.capabilities_score for a in m.schedule.agents if isinstance(a, CompanyAgent)),
                             "GDP": lambda m: {agent.country: agent.calculate_gdp() for agent in m.schedule.agents if isinstance(agent, CountryAgent)}},
             agent_reporters={"Agent Attributes": lambda a: a.__dict__,} )
 
+    def load_config(self, config_file):
+        with open(config_file, 'r') as f:
+            return yaml.safe_load(f)
+    
+    
     def check_invasion_condition(self):
+        """
+        Check the condition for invasion and update the invasion probability.
+        """
         for agent in self.schedule.agents:
             if isinstance(agent, CountryAgent) and agent.country == "China":
                 self.invasion_probability = max(0, 1 - agent.public_opinion / 10)
@@ -112,21 +124,18 @@ class GameModel(Model):
             return agent
       return None  # No agent found
     
-  
-    def load_config(self, config_file):
-        with open(config_file, 'r') as f:
-            return yaml.safe_load(f)
-    
+ 
     def step(self):
       '''Advance the model by one step.'''
       self.datacollector.collect(self) #collect data
       self.schedule.step()
       self.check_invasion_condition()
+      #if a random number is less than the invasion probability (this is just a dummy stand in)
       if np.random.random() < self.invasion_probability:
+        #set the flag that china invades taiwan
         self.china_invades_taiwan = True
 
-            # Find the Chinese mine and Japanese processing plant
-        # Find the Chinese mine and Japanese processing plant
+    # Find the Chinese mine and Japanese processing plant
       chinese_mine = next((agent for agent in self.schedule.agents if isinstance(agent, MineAgent) and agent.country == "China"), None)
       japanese_plant = next((agent for agent in self.schedule.agents if isinstance(agent, ProcessingPlantAgent) and agent.country == "Japan"), None)
 
@@ -136,5 +145,7 @@ class GameModel(Model):
         amount = min(chinese_mine.resources["silicon"], transfer_amount)
 
             # Transfer the silicon
+        
+            # The send_resources and receive_resources methods are not defined in this code
         amount_sent = chinese_mine.send_resources(amount)
         japanese_plant.receive_resources(amount_sent)

@@ -4,7 +4,7 @@ import pandas as pd
 
 def main():
     # Simulate the model
-    model = GameModel(5)  # Create a model with 100 agents
+    model = GameModel(5)  
     for i in range(100):  # Simulate for 100 steps
         model.step()
 

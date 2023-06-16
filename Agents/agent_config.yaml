@@ -12,6 +12,26 @@ CompanyAgent:
   government_lobby_money_threshold: 50
   government_lobby_talent_threshold: 5
   competition_percentage: 0.1
+  Nvidia:
+    talent_range: [5, 10]
+    initial_resources: {'money': 100, 'chips': 100}
+    # more Nvidia-specific configurations here...
+  TSMC:
+    talent_range: [7, 12]
+    initial_resources: {'money': 150, 'chips': 150}
+    # more TSMC-specific configurations here...
+  Infineon:
+    talent_range: [7, 12]
+    initial_resources: {'money': 150, 'chips': 150}
+    # more Infineon-specific configurations here...
+  Renesas:
+    talent_range: [7, 12]
+    initial_resources: {'money': 150, 'chips': 150}
+    # more Renesas-specific configurations here...
+  SMIC:
+    talent_range: [7, 12]
+    initial_resources: {'money': 150, 'chips': 150}
+    # more SMIC-specific configurations here...
 CountryAgent: 
   initial_resources: 
     money: 100

@@ -9,9 +9,9 @@ class CompanyAgent(Agent):
 
         # Load yaml file
         with open('Agents/agent_config.yaml') as yaml_file:
-            data = yaml.safe_load(yaml_file)
+            self.data = yaml.safe_load(yaml_file)
 
-        company_data = data["CompanyAgent"]
+        company_data = self.data["CompanyAgent"]
 
         self.talent = random.randint(*company_data["talent_range"]) 
         self.resources = company_data["initial_resources"].copy()
@@ -20,6 +20,7 @@ class CompanyAgent(Agent):
         self.company_name = company_name  
         self.capabilities_score = 0
         self.public_opinion = 0
+        self.partners = []
         
         self.influence = company_data["influence"]
         self.project_launch_threshold = company_data["project_launch_threshold"]
@@ -29,6 +30,20 @@ class CompanyAgent(Agent):
         self.government_lobby_talent_threshold = company_data["government_lobby_talent_threshold"]
         self.competition_percentage = company_data["competition_percentage"]
         #print(f'Created CompanyAgent with id {self.unique_id}')
+    
+    def add_partner(self, partner):
+        """
+        Add a partner to this company's list of partners.
+
+        Args:
+        partner (CompanyAgent): The company to add as a partner.
+
+        Returns:
+        None
+        """
+        # Check if the partner is already in the list
+        if partner not in self.partners:
+            self.partners.append(partner)
 
     def get_country(self):
         return self.country_agent.country
@@ -451,3 +466,68 @@ class CountryAgent(Agent):
         self.prev_resources = self.resources.copy()  # Save current resource levels for the next time step
         self.gdp = self.calculate_gdp()
     
+class NvidiaAgent(CompanyAgent):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.type = 'Nvidia'
+        self.talent = random.randint(*self.data["CompanyAgent"]["Nvidia"]["talent_range"])
+        self.resources = self.data["CompanyAgent"]["Nvidia"]["initial_resources"].copy()
+
+    def order_chips_from_TSMC(self):
+        # Find the TSMC agent in the model's schedule
+        TSMC_agent = None
+        for agent in self.model.schedule.agents:
+            if isinstance(agent, TSMCAgent):
+                TSMC_agent = agent
+                break
+
+        if TSMC_agent is None:
+            raise Exception("TSMC agent not found in the model's schedule.")
+
+        # Calculate quantity of chips to order
+        # We'll use 10% of the available money, and 5 chips per point of capabilities
+        quantity = int(self.resources["money"] * 0.1) + self.capabilities_score * 5
+
+        # Calculate the cost of the chips (assuming 1 chip costs 10 money)
+        cost = quantity * 10
+
+        # Check if Nvidia has enough money
+        if self.resources["money"] >= cost:
+            # Subtract money from Nvidia and add chips
+            self.resources["money"] -= cost
+            self.resources["chips"] += quantity
+
+            # Add money to TSMC
+            TSMC_agent.resources["money"] += cost
+        else:
+            raise Exception("Nvidia does not have enough resources to complete the transaction.")
+
+class TSMCAgent(CompanyAgent):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.type = 'TSMC'
+        self.talent = random.randint(*self.data["CompanyAgent"]["TSMC"]["talent_range"])
+        self.resources = self.data["CompanyAgent"]["TSMC"]["initial_resources"].copy()
+
+
+class SMICAgent(CompanyAgent):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.type = 'SMIC'
+        self.talent = random.randint(*self.data["CompanyAgent"]["SMIC"]["talent_range"])
+        self.resources = self.data["CompanyAgent"]["SMIC"]["initial_resources"].copy()
+
+
+class InfineonAgent(CompanyAgent):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.type = 'Infineon'
+        self.talent = random.randint(*self.data["CompanyAgent"]["Infineon"]["talent_range"])
+        self.resources = self.data["CompanyAgent"]["Infineon"]["initial_resources"].copy()
+
+class RenesasAgent(CompanyAgent):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.type = 'Renesas'
+        self.talent = random.randint(*self.data["CompanyAgent"]["Renesas"]["talent_range"])
+        self.resources = self.data["CompanyAgent"]["Renesas"]["initial_resources"].copy()

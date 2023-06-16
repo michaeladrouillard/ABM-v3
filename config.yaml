@@ -33,3 +33,15 @@ CompanyAgent:
   money_range: [100, 1000]
   chips_range: [100, 1000]
   talent_range: [1, 10]
+
+
+company_country_map:
+  US: [Nvidia, Intel]
+  Taiwan: [TSMC, MediaTek]
+  China: [SMIC, HuaHong]
+  EU: [Infineon, STMicroelectronics]
+  Japan: [Renesas, Sony]
+
+
+partnerships:
+  - [Nvidia, TSMC]

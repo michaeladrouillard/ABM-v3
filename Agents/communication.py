@@ -3,7 +3,7 @@ from mesa import Agent
 from mesa.time import RandomActivation
 
 class CommunicationChannel:
-  def __init__(self, name, distortion):
+  def __init__(self, name, distortion, model):
     self.name = name
     self.distortion = distortion
 
