@@ -1,23 +1,19 @@
 from model import *
 import matplotlib.pyplot as plt
 import pandas as pd
+from tqdm import tqdm
+import cProfile
 
-def main():
-    # Simulate the model
-    model = GameModel(5)  
-    for i in range(100):  # Simulate for 100 steps
+
+def run_model(agent_dict):
+    model = GameModel(agent_dict)
+    for _ in tqdm(range(10000), desc="Running model"):
         model.step()
+   
 
     # Collect and save model data
     model_data = model.datacollector.get_model_vars_dataframe()
-    # Expand the GDP column into separate columns for each country
-    gdp_data = model_data['GDP'].apply(pd.Series)
 
-    # Prefix each GDP column with 'GDP_'
-    gdp_data = gdp_data.add_prefix('GDP_')
-
-    # Concatenate the expanded GDP data with the original model data
-    model_data = pd.concat([model_data.drop('GDP', axis=1), gdp_data], axis=1)
 
     # Save the processed model data
     model_data.to_csv('model_data.csv')
@@ -25,6 +21,7 @@ def main():
 
     # Collect and save agent data
     agent_data = model.datacollector.get_agent_vars_dataframe()
+    print(agent_data.head())
 
     attribute_cols = ['unique_id', 'talent', 'resources', 'prev_resources', 'country_agent',
                       'company_name', 'capabilities_score', 'public_opinion', 'influence', 
@@ -34,14 +31,22 @@ def main():
     
     for col in attribute_cols:
         agent_data[col] = agent_data['Agent Attributes'].apply(lambda x: x.get(col))
-    agent_data['money'] = agent_data['resources'].apply(lambda x: x.get('money'))
-    agent_data['chips'] = agent_data['resources'].apply(lambda x: x.get('chips'))
-    agent_data = agent_data.drop('Agent Attributes', axis=1)
-    agent_data.to_csv('agent_data.csv')
+        agent_data['money'] = agent_data['resources'].apply(lambda x: x.get('money'))
+        agent_data['chips'] = agent_data['resources'].apply(lambda x: x.get('chips'))
+        agent_data = agent_data.drop('Agent Attributes', axis=1)
+        agent_data.to_csv('agent_data.csv')
 
-    # Plot model data
+ # Plot model data
     model_data.plot()
     plt.show()
+def main():
+
+    global agent_dict
+    config_file = 'config.yaml'
+    with open(config_file, 'r') as f:
+        agent_dict = yaml.safe_load(f)
+
+    cProfile.run('run_model(agent_dict)')
 
 if __name__ == "__main__":
     main()

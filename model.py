@@ -17,23 +17,15 @@ import networkx as nx
 import yaml
 
 class GameModel(Model):
-    def __init__(self, N, config_file='config.yaml'):
-        """
-        Initializing an instance of the Game Model class.
-        N is the number of agents (determined in main).
-        config_file is the path to the YAML configuration."""
+    def __init__(self, agent_dict):
         #Define communication channels
         self.communication_channels = {"Press Conference": CommunicationChannel("Press Conference", 0.1, self),
                                         "Twitter": CommunicationChannel("Twitter", 0.5, self)}
-        self.num_agents = N
         #Creating a schedule using Mesa's RandomActivation
         self.schedule = RandomActivation(self)
         #Initializing the flags and counters of the main risk we're investigating
         self.china_invades_taiwan = False #indicator of war
         self.invasion_probability = 0 #probability of invasion
-        #Loading in the YAML configurations
-        self.company_affiliations = {"US": "Nvidia", "China": "SMIC", "EU": "Infineon", "Japan": "Renesas", "Taiwan": "TSMC"}  # Company affiliations
-        self.config = self.load_config(config_file)
         self.company_class_mapping = {
     "Nvidia": NvidiaAgent,
     "SMIC": SMICAgent,
@@ -42,15 +34,10 @@ class GameModel(Model):
     "TSMC": TSMCAgent,
 }
 
-  #Create agents
-        countries = ["US", "China", "EU", "Japan", "Taiwan"]
-        random.shuffle(countries)  # Shuffle the list to add randomness
         agent_id = 0
-
-        
         # Loop over each country and its corresponding list of companies from the YAML file
-        for country, companies in self.config["company_country_map"].items():
-            country_config = self.config["countries"].get(country, {})
+        for country, companies in agent_dict["company_country_map"].items():
+            country_config = agent_dict["countries"].get(country, {})
             num_mines = country_config.pop('mines', 0)
             num_plants = country_config.pop('plants', 0)
 
@@ -66,7 +53,6 @@ class GameModel(Model):
                 country_agent.set_company(company_agent)
                 self.schedule.add(company_agent)
 
-            # Creating Mines and Plants as previously in your code
             for _ in range(num_mines):
                 mine_agent = MineAgent(agent_id, self, country_agent)
                 self.schedule.add(mine_agent)
@@ -76,7 +62,7 @@ class GameModel(Model):
                 self.schedule.add(processing_plant_agent)
                 agent_id += 1  # Increment the agent ID
 
-        additional_companies = self.config["additional_companies"]  # Load the number of additional companies from the yaml file
+        additional_companies = agent_dict["additional_companies"]  # Load the number of additional companies from the yaml file
         for _ in range(additional_companies):
             country_agent = random.choice(self.schedule.agents)  # Choose a random country agent
             company_name = f"Company_{agent_id}"  # Generate a unique company name based on the agent ID
@@ -84,15 +70,15 @@ class GameModel(Model):
             agent_id += 1  # Increment the agent ID
 
             # Randomize the company's resources and talent
-            company_agent.resources["money"] = random.randint(*self.config["CompanyAgent"]["money_range"])
-            company_agent.resources["chips"] = random.randint(*self.config["CompanyAgent"]["chips_range"])
-            company_agent.talent = random.randint(*self.config["CompanyAgent"]["talent_range"])
+            company_agent.resources["money"] = random.randint(*agent_dict["CompanyAgent"]["money_range"])
+            company_agent.resources["chips"] = random.randint(*agent_dict["CompanyAgent"]["chips_range"])
+            company_agent.talent = random.randint(*agent_dict["CompanyAgent"]["talent_range"])
 
             self.schedule.add(company_agent)  # Add the company agent to the schedule
 
     # Create a random network of agents
-        G = nx.erdos_renyi_graph(n=self.num_agents, p=0.1)
-        self.network = nx.relabel_nodes(G, dict(zip(range(self.num_agents), self.schedule.agents)))
+        #G = nx.erdos_renyi_graph(n=self.num_agents, p=0.1)
+        #self.network = nx.relabel_nodes(G, dict(zip(range(self.num_agents), self.schedule.agents)))
 
         #Initialize a data collector
         self.datacollector = DataCollector(
@@ -104,9 +90,9 @@ class GameModel(Model):
                             "GDP": lambda m: {agent.country: agent.calculate_gdp() for agent in m.schedule.agents if isinstance(agent, CountryAgent)}},
             agent_reporters={"Agent Attributes": lambda a: a.__dict__,} )
 
-    def load_config(self, config_file):
-        with open(config_file, 'r') as f:
-            return yaml.safe_load(f)
+    #def load_config(self, config_file):
+        #with open(config_file, 'r') as f:
+            #return yaml.safe_load(f)
     
     
     def check_invasion_condition(self):
@@ -135,17 +121,17 @@ class GameModel(Model):
         #set the flag that china invades taiwan
         self.china_invades_taiwan = True
 
-    # Find the Chinese mine and Japanese processing plant
-      chinese_mine = next((agent for agent in self.schedule.agents if isinstance(agent, MineAgent) and agent.country == "China"), None)
-      japanese_plant = next((agent for agent in self.schedule.agents if isinstance(agent, ProcessingPlantAgent) and agent.country == "Japan"), None)
+    # # Find the Chinese mine and Japanese processing plant
+    #   chinese_mine = next((agent for agent in self.schedule.agents if isinstance(agent, MineAgent) and agent.country == "China"), None)
+    #   japanese_plant = next((agent for agent in self.schedule.agents if isinstance(agent, ProcessingPlantAgent) and agent.country == "Japan"), None)
 
-      if chinese_mine and japanese_plant:
-            # Determine how much silicon to send
-        transfer_amount = self.config["resource_transfer"]["China"]["Japan"]["silicon"]
-        amount = min(chinese_mine.resources["silicon"], transfer_amount)
+    #   if chinese_mine and japanese_plant:
+    #         # Determine how much silicon to send
+    #     transfer_amount = self.config["resource_transfer"]["China"]["Japan"]["silicon"]
+    #     amount = min(chinese_mine.resources["silicon"], transfer_amount)
 
-            # Transfer the silicon
+    #         # Transfer the silicon
         
-            # The send_resources and receive_resources methods are not defined in this code
-        amount_sent = chinese_mine.send_resources(amount)
-        japanese_plant.receive_resources(amount_sent)
+    #         # The send_resources and receive_resources methods are not defined in this code
+    #     amount_sent = chinese_mine.send_resources(amount)
+    #     japanese_plant.receive_resources(amount_sent)
