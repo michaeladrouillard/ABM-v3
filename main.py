@@ -21,7 +21,6 @@ def run_model(agent_dict):
 
     # Collect and save agent data
     agent_data = model.datacollector.get_agent_vars_dataframe()
-    print(agent_data.head())
 
     # attribute_cols = ['unique_id', 'talent', 'resources', 'prev_resources', 'country_agent',
     #                   'company_name', 'capabilities_score', 'public_opinion', 'influence', 
@@ -46,7 +45,7 @@ def main():
     with open(config_file, 'r') as f:
         agent_dict = yaml.safe_load(f)
 
-    cProfile.run('run_model(agent_dict)')
+    cProfile.run('run_model(agent_dict)', 'output.pstats')
 
 if __name__ == "__main__":
     main()

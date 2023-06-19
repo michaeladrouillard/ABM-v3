@@ -31,8 +31,8 @@ class GameModel(Model):
     "SMIC": SMICAgent,
     "Infineon": InfineonAgent,
     "Renesas": RenesasAgent,
-    "TSMC": TSMCAgent,
-}
+    "TSMC": TSMCAgent,}
+
 
         agent_id = 0
         # Loop over each country and its corresponding list of companies from the YAML file
@@ -94,7 +94,8 @@ class GameModel(Model):
         #with open(config_file, 'r') as f:
             #return yaml.safe_load(f)
     
-    
+        self.print_agents()
+
     def check_invasion_condition(self):
         """
         Check the condition for invasion and update the invasion probability.
@@ -110,7 +111,10 @@ class GameModel(Model):
             return agent
       return None  # No agent found
     
- 
+    def print_agents(self):
+        for agent in self.schedule.agents:
+            print(f'Agent ID: {agent.unique_id}, Agent Type: {agent.__class__.__name__}')
+
     def step(self):
       '''Advance the model by one step.'''
       self.datacollector.collect(self) #collect data
