@@ -19,6 +19,9 @@ class ProcessingPlantAgent(Agent):
         # Set initial resources based on the JSON file
         self.resources = plant_data["initial_resources"]
 
+    def report(self):
+        return {'Resources': self.resources,}
+
     def process(self):
         # A simple processing model
         if self.country_agent.resources["silicon"] > 0:

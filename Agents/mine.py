@@ -39,6 +39,9 @@ class MineAgent(Agent):
         elif "Less Money" in message:
             self.public_opinion -= self.model.communication_channels["Twitter"].distortion if "Twitter" in message else self.model.communication_channels["Press Conference"].distortion
 
+    def report(self):
+        return {'Resources': self.resources,}
+
 
     def step(self):
         self.extract()

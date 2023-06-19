@@ -88,7 +88,7 @@ class GameModel(Model):
                             "Invasion Probability": lambda m: m.invasion_probability,
                             "Total Capabilities Growth Rate": lambda m: sum(a.capabilities_score for a in m.schedule.agents if isinstance(a, CompanyAgent)),
                             "GDP": lambda m: {agent.country: agent.calculate_gdp() for agent in m.schedule.agents if isinstance(agent, CountryAgent)}},
-            agent_reporters={"Agent Attributes": lambda a: a.__dict__,} )
+            agent_reporters={"Agent Report": lambda a: a.report()} )
 
     #def load_config(self, config_file):
         #with open(config_file, 'r') as f:

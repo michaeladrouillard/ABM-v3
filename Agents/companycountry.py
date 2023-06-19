@@ -45,6 +45,10 @@ class CompanyAgent(Agent):
         if partner not in self.partners:
             self.partners.append(partner)
 
+    def report(self):
+        return {'Talent': self.talent,
+                'Company Name': self.company_name,}
+
     def get_country(self):
         return self.country_agent.country
 
@@ -277,7 +281,9 @@ class CountryAgent(Agent):
         self.research_capacity_gain = country_data["research_capacity_gain"]
 
         
-  
+    def report(self):
+        return {'Country': self.country,}
+    
     def set_company(self, company_agent):
         self.company = company_agent  # Associate a CompanyAgent with this CountryAgent
         self.gdp = self.calculate_gdp()  # Update GDP after company agent is set
@@ -501,6 +507,8 @@ class NvidiaAgent(CompanyAgent):
             TSMC_agent.resources["money"] += cost
         else:
             raise Exception("Nvidia does not have enough resources to complete the transaction.")
+
+
 
 class TSMCAgent(CompanyAgent):
     def __init__(self, *args, **kwargs):
