@@ -1,4 +1,4 @@
-from Agents.companycountry import CountryAgent, CompanyAgent, NvidiaAgent, SMICAgent, InfineonAgent, RenesasAgent, TSMCAgent
+from Agents.companycountry import CountryAgent, CompanyAgent, NvidiaAgent, SMICAgent, InfineonAgent, RenesasAgent, TSMCAgent, IntelAgent, HuaHongAgent, STMicroelectronicsAgent, SonyAgent, MediaTekAgent, ASMLAgent 
 from Agents.communication import CommunicationChannel
 from Agents.resource import Resource
 from Agents.mine import MineAgent
@@ -27,11 +27,17 @@ class GameModel(Model):
         self.china_invades_taiwan = False #indicator of war
         self.invasion_probability = 0 #probability of invasion
         self.company_class_mapping = {
+    "ASML": ASMLAgent,
     "Nvidia": NvidiaAgent,
+    "Intel": IntelAgent,
     "SMIC": SMICAgent,
+    "HuaHong": HuaHongAgent,
     "Infineon": InfineonAgent,
+    "STMicroelectronics": STMicroelectronicsAgent,
     "Renesas": RenesasAgent,
-    "TSMC": TSMCAgent,}
+    "Sony": SonyAgent,
+    "TSMC": TSMCAgent,
+    "MediaTek": MediaTekAgent,}
 
 
         agent_id = 0

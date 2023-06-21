@@ -2,6 +2,8 @@ import random
 from mesa import Agent
 from mesa.time import RandomActivation
 import yaml
+from collections import deque
+from plant import ProcessingPlantAgent
 
 class CompanyAgent(Agent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -499,15 +501,25 @@ class NvidiaAgent(CompanyAgent):
 
         # Check if Nvidia has enough money
         if self.resources["money"] >= cost:
-            # Subtract money from Nvidia and add chips
+            # Subtract money from Nvidia
             self.resources["money"] -= cost
-            self.resources["chips"] += quantity
 
-            # Add money to TSMC
-            TSMC_agent.resources["money"] += cost
+        # Place the order with TSMC
+            TSMC_agent.receive_order(self, quantity)
         else:
             raise Exception("Nvidia does not have enough resources to complete the transaction.")
 
+
+    def step(self):
+        # Decide when to order chips from TSMC
+        self.order_chips_from_TSMC()
+
+class IntelAgent(CompanyAgent):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.type = 'Intel'
+        self.talent = random.randint(*self.data["CompanyAgent"]["Intel"]["talent_range"])
+        self.resources = self.data["CompanyAgent"]["Intel"]["initial_resources"].copy()
 
 
 class TSMCAgent(CompanyAgent):
@@ -516,6 +528,95 @@ class TSMCAgent(CompanyAgent):
         self.type = 'TSMC'
         self.talent = random.randint(*self.data["CompanyAgent"]["TSMC"]["talent_range"])
         self.resources = self.data["CompanyAgent"]["TSMC"]["initial_resources"].copy()
+        self.order_book = deque()  # Initialize the order book as an empty deque
+
+    def receive_order(self, ordering_agent, quantity):
+        self.order_book.append((ordering_agent, quantity))  # Append the new order to the order book
+    
+    def manufacture_chips(self):
+        if len(self.order_book) == 0:  # If the order book is empty, there's nothing to manufacture
+            return
+        
+        ordering_agent, quantity = self.order_book.popleft()  # Get the oldest order from the order book
+
+        # Check how many chips TSMC can manufacture with its current resources
+        max_quantity = min(self.resources['silicon']//2, self.resources['tools'], quantity)
+        
+        # If TSMC can't manufacture any chips, put the order back in the order book
+        if max_quantity == 0:
+            self.order_book.appendleft((ordering_agent, quantity))
+            return
+
+        # Subtract the used resources and add the manufactured chips
+        self.resources['silicon'] -= max_quantity*2
+        self.resources['tools'] -= max_quantity
+        self.resources['chips'] += max_quantity
+
+        # Send the manufactured chips to the ordering agent
+        self.send_chips_to(ordering_agent, max_quantity)
+
+    def send_chips_to(self, receiving_agent, quantity):
+        # Subtract the chips from TSMC and add them to the receiving agent
+        self.resources['chips'] -= quantity
+        receiving_agent.resources['chips'] += quantity
+
+    
+    def buy_resources_from(self, other_agent, resource_type, quantity):
+        # Check if the other agent has enough of the resource
+        if other_agent.resources[resource_type] >= quantity:
+            # Calculate the cost of the resources (assuming each unit of resource costs 5 money)
+            cost = quantity * 5
+
+            # Check if TSMC has enough money
+            if self.resources["money"] >= cost:
+                # Subtract money from TSMC and add the resources
+                self.resources["money"] -= cost
+                self.resources[resource_type] += quantity
+
+                # Subtract the resources from the other agent and add the money
+                other_agent.resources[resource_type] -= quantity
+                other_agent.resources["money"] += cost
+            else:
+                raise Exception("TSMC does not have enough money to buy the resources.")
+        else:
+            raise Exception(f"The other agent does not have enough {resource_type} to sell.")
+            
+    def step(self):
+        # Update resources based on interactions with other agents
+        # For simplicity, we'll just find the first ToolManufacturerAgent and SiliconProcessingAgent in the model's schedule
+        tool_manufacturer = None
+        silicon_processing_plant = None
+        for agent in self.model.schedule.agents:
+            if isinstance(agent, ASMLAgent) and tool_manufacturer is None:
+                tool_manufacturer = agent
+            elif isinstance(agent, ProcessingPlantAgent) and silicon_processing_plant is None:
+                silicon_processing_plant = agent
+
+            # If we found both agents, we can break the loop
+            if tool_manufacturer is not None and silicon_processing_plant is not None:
+                break
+
+        # Buy resources from the tool manufacturer and silicon processing plant
+        self.buy_resources_from(tool_manufacturer, 'tools', 10)
+        self.buy_resources_from(silicon_processing_plant, 'silicon', 20)
+
+        # Manufacture chips
+        self.manufacture_chips(10)
+
+class ASMLAgent(CompanyAgent):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.type = 'ASML'
+        self.talent = random.randint(*self.data["CompanyAgent"]["ASML"]["talent_range"])
+        self.resources = self.data["CompanyAgent"]["ASML"]["initial_resources"].copy()
+
+
+class MediaTekAgent(CompanyAgent):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.type = 'MediaTek'
+        self.talent = random.randint(*self.data["CompanyAgent"]["MediaTek"]["talent_range"])
+        self.resources = self.data["CompanyAgent"]["MediaTek"]["initial_resources"].copy()
 
 
 class SMICAgent(CompanyAgent):
@@ -525,6 +626,12 @@ class SMICAgent(CompanyAgent):
         self.talent = random.randint(*self.data["CompanyAgent"]["SMIC"]["talent_range"])
         self.resources = self.data["CompanyAgent"]["SMIC"]["initial_resources"].copy()
 
+class HuaHongAgent(CompanyAgent):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.type = 'HuaHong'
+        self.talent = random.randint(*self.data["CompanyAgent"]["HuaHong"]["talent_range"])
+        self.resources = self.data["CompanyAgent"]["HuaHong"]["initial_resources"].copy()
 
 class InfineonAgent(CompanyAgent):
     def __init__(self, *args, **kwargs):
@@ -533,9 +640,53 @@ class InfineonAgent(CompanyAgent):
         self.talent = random.randint(*self.data["CompanyAgent"]["Infineon"]["talent_range"])
         self.resources = self.data["CompanyAgent"]["Infineon"]["initial_resources"].copy()
 
+class STMicroelectronicsAgent(CompanyAgent):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.type = 'STMicroelectronics'
+        self.talent = random.randint(*self.data["CompanyAgent"]["STMicroelectronics"]["talent_range"])
+        self.resources = self.data["CompanyAgent"]["STMicroelectronics"]["initial_resources"].copy()
+
+
 class RenesasAgent(CompanyAgent):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.type = 'Renesas'
         self.talent = random.randint(*self.data["CompanyAgent"]["Renesas"]["talent_range"])
         self.resources = self.data["CompanyAgent"]["Renesas"]["initial_resources"].copy()
+
+class SonyAgent(CompanyAgent):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.type = 'Sony'
+        self.talent = random.randint(*self.data["CompanyAgent"]["Sony"]["talent_range"])
+        self.resources = self.data["CompanyAgent"]["Sony"]["initial_resources"].copy()
+
+
+
+import unittest
+
+class TestChipTransaction(unittest.TestCase):
+    def setUp(self):
+        # Create a new Nvidia agent and TSMC agent with initial resources
+        self.nvidia = NvidiaAgent(resources={"money": 1000, "chips": 0})
+        self.tsmc = TSMCAgent(resources={"money": 0, "chips": 100})
+
+    def test_transaction(self):
+        # Nvidia places an order for 50 chips
+        self.nvidia.order_chips_from_TSMC(quantity=50)
+
+        # Check that money has been transferred from Nvidia to TSMC
+        self.assertEqual(self.nvidia.resources["money"], 950)
+        self.assertEqual(self.tsmc.resources["money"], 50)
+
+        # TSMC fulfills the order
+        self.tsmc.manufacture_chips()
+        self.tsmc.send_out_orders()
+
+        # Check that chips have been transferred from TSMC to Nvidia
+        self.assertEqual(self.nvidia.resources["chips"], 50)
+        self.assertEqual(self.tsmc.resources["chips"], 50)
+
+if __name__ == "__main__":
+    unittest.main()

@@ -16,7 +16,15 @@ CompanyAgent:
     talent_range: [5, 10]
     initial_resources: {'money': 100, 'chips': 100}
     # more Nvidia-specific configurations here...
+  Intel:
+    talent_range: [5, 10]
+    initial_resources: {'money': 100, 'chips': 100}
+    # more Nvidia-specific configurations here...
   TSMC:
+    talent_range: [7, 12]
+    initial_resources: {'money': 150, 'chips': 150}
+    # more TSMC-specific configurations here...
+  MediaTek:
     talent_range: [7, 12]
     initial_resources: {'money': 150, 'chips': 150}
     # more TSMC-specific configurations here...
@@ -24,11 +32,23 @@ CompanyAgent:
     talent_range: [7, 12]
     initial_resources: {'money': 150, 'chips': 150}
     # more Infineon-specific configurations here...
+  STMicroelectronics:
+    talent_range: [7, 12]
+    initial_resources: {'money': 150, 'chips': 150}
+    # more Infineon-specific configurations here...
   Renesas:
     talent_range: [7, 12]
     initial_resources: {'money': 150, 'chips': 150}
     # more Renesas-specific configurations here...
+  Sony:
+    talent_range: [7, 12]
+    initial_resources: {'money': 150, 'chips': 150}
+    # more Renesas-specific configurations here...
   SMIC:
+    talent_range: [7, 12]
+    initial_resources: {'money': 150, 'chips': 150}
+    # more SMIC-specific configurations here...
+  HuaHong:
     talent_range: [7, 12]
     initial_resources: {'money': 150, 'chips': 150}
     # more SMIC-specific configurations here...

@@ -39,9 +39,9 @@ company_country_map:
   US: [Nvidia, Intel]
   Taiwan: [TSMC, MediaTek]
   China: [SMIC, HuaHong]
-  EU: [Infineon, STMicroelectronics]
+  EU: [Infineon, STMicroelectronics, ASML]
   Japan: [Renesas, Sony]
 
 
 partnerships:
-  - [Nvidia, TSMC]
+  - [Nvidia, TSMC] # https://focustaiwan.tw/business/202306020017
