@@ -3,7 +3,51 @@ from mesa import Agent
 from mesa.time import RandomActivation
 import yaml
 from collections import deque
-from plant import ProcessingPlantAgent
+
+
+import random
+from mesa import Agent
+from mesa.time import RandomActivation
+import yaml
+
+class ProcessingPlantAgent(Agent):
+    def __init__(self, unique_id, model, country_agent):
+        super().__init__(unique_id, model)
+        self.country_agent = country_agent
+        self.country = country_agent.country 
+        self.public_opinion  = 0
+        # Load yaml file
+        with open('Agents/agent_config.yaml') as yaml_file:
+            data = yaml.safe_load(yaml_file)
+
+
+        plant_data = data["ProcessingPlantAgent"]
+
+        # Set initial resources based on the JSON file
+        self.resources = plant_data["initial_resources"]
+
+    def report(self):
+        return {'Resources': self.resources,}
+
+    def process(self):
+        # A simple processing model
+        if self.country_agent.resources["silicon"] > 0:
+            processed = self.country_agent.resources["silicon"] * self.country_agent.processing_capacity
+            self.country_agent.resources["silicon"] -= processed
+            self.country_agent.resources["chips"] += processed * 10  # Assume each unit of silicon gives 10 chips
+    
+    def receive_resources(self, amount):
+        self.resources["silicon"] += amount
+    
+    def receive_message(self, message):   
+        if "More Money" in message:
+            self.public_opinion += self.model.communication_channels["Twitter"].distortion if "Twitter" in message else self.model.communication_channels["Press Conference"].distortion
+        elif "Less Money" in message:
+            self.public_opinion -= self.model.communication_channels["Twitter"].distortion if "Twitter" in message else self.model.communication_channels["Press Conference"].distortion
+
+
+    def step(self):
+        self.process()
 
 class CompanyAgent(Agent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -13,10 +57,10 @@ class CompanyAgent(Agent):
         with open('Agents/agent_config.yaml') as yaml_file:
             self.data = yaml.safe_load(yaml_file)
 
-        company_data = self.data["CompanyAgent"]
+        self.company_data = self.data["CompanyAgent"]
 
-        self.talent = random.randint(*company_data["talent_range"]) 
-        self.resources = company_data["initial_resources"].copy()
+        self.talent = random.randint(*self.company_data["talent_range"]) 
+        self.resources = self.company_data["initial_resources"].copy()
         self.prev_resources = self.resources.copy() 
         self.country_agent = country_agent 
         self.company_name = company_name  
@@ -24,13 +68,13 @@ class CompanyAgent(Agent):
         self.public_opinion = 0
         self.partners = []
         
-        self.influence = company_data["influence"]
-        self.project_launch_threshold = company_data["project_launch_threshold"]
-        self.government_lobby_money_threshold = company_data["government_lobby_money_threshold"]
-        self.cooperation_thresholds = company_data["cooperation_thresholds"]
-        self.project_launch_cost = company_data["project_launch_cost"]
-        self.government_lobby_talent_threshold = company_data["government_lobby_talent_threshold"]
-        self.competition_percentage = company_data["competition_percentage"]
+        self.influence = self.company_data["influence"]
+        self.project_launch_threshold = self.company_data["project_launch_threshold"]
+        self.government_lobby_money_threshold = self.company_data["government_lobby_money_threshold"]
+        self.cooperation_thresholds = self.company_data["cooperation_thresholds"]
+        self.project_launch_cost = self.company_data["project_launch_cost"]
+        self.government_lobby_talent_threshold = self.company_data["government_lobby_talent_threshold"]
+        self.competition_percentage = self.company_data["competition_percentage"]
         #print(f'Created CompanyAgent with id {self.unique_id}')
     
     def add_partner(self, partner):
@@ -478,8 +522,8 @@ class NvidiaAgent(CompanyAgent):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.type = 'Nvidia'
-        self.talent = random.randint(*self.data["CompanyAgent"]["Nvidia"]["talent_range"])
-        self.resources = self.data["CompanyAgent"]["Nvidia"]["initial_resources"].copy()
+        self.talent = random.randint(*self.company_data["Nvidia"]["talent_range"])
+        self.resources = self.company_data["Nvidia"]["initial_resources"].copy()
 
     def order_chips_from_TSMC(self):
         # Find the TSMC agent in the model's schedule
@@ -506,8 +550,7 @@ class NvidiaAgent(CompanyAgent):
 
         # Place the order with TSMC
             TSMC_agent.receive_order(self, quantity)
-        else:
-            raise Exception("Nvidia does not have enough resources to complete the transaction.")
+
 
 
     def step(self):
@@ -518,16 +561,16 @@ class IntelAgent(CompanyAgent):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.type = 'Intel'
-        self.talent = random.randint(*self.data["CompanyAgent"]["Intel"]["talent_range"])
-        self.resources = self.data["CompanyAgent"]["Intel"]["initial_resources"].copy()
+        self.talent = random.randint(*self.company_data["Intel"]["talent_range"])
+        self.resources = self.company_data["Intel"]["initial_resources"].copy()
 
 
 class TSMCAgent(CompanyAgent):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.type = 'TSMC'
-        self.talent = random.randint(*self.data["CompanyAgent"]["TSMC"]["talent_range"])
-        self.resources = self.data["CompanyAgent"]["TSMC"]["initial_resources"].copy()
+        self.talent = random.randint(*self.company_data["TSMC"]["talent_range"])
+        self.resources = self.company_data["TSMC"]["initial_resources"].copy()
         self.order_book = deque()  # Initialize the order book as an empty deque
 
     def receive_order(self, ordering_agent, quantity):
@@ -561,25 +604,22 @@ class TSMCAgent(CompanyAgent):
         receiving_agent.resources['chips'] += quantity
 
     
-    def buy_resources_from(self, other_agent, resource_type, quantity):
-        # Check if the other agent has enough of the resource
-        if other_agent.resources[resource_type] >= quantity:
-            # Calculate the cost of the resources (assuming each unit of resource costs 5 money)
-            cost = quantity * 5
+    # def buy_resources_from(self, other_agent, resource_type, quantity):
+    #     # Check if the other agent has enough of the resource
+    #     if other_agent.resources[resource_type] >= quantity:
+    #         # Calculate the cost of the resources (assuming each unit of resource costs 5 money)
+    #         cost = quantity * 5
 
-            # Check if TSMC has enough money
-            if self.resources["money"] >= cost:
-                # Subtract money from TSMC and add the resources
-                self.resources["money"] -= cost
-                self.resources[resource_type] += quantity
+    #         # Check if TSMC has enough money
+    #         if self.resources["money"] >= cost:
+    #             # Subtract money from TSMC and add the resources
+    #             self.resources["money"] -= cost
+    #             self.resources[resource_type] += quantity
 
-                # Subtract the resources from the other agent and add the money
-                other_agent.resources[resource_type] -= quantity
-                other_agent.resources["money"] += cost
-            else:
-                raise Exception("TSMC does not have enough money to buy the resources.")
-        else:
-            raise Exception(f"The other agent does not have enough {resource_type} to sell.")
+    #             # Subtract the resources from the other agent and add the money
+    #             other_agent.resources[resource_type] -= quantity
+    #             other_agent.resources["money"] += cost
+
             
     def step(self):
         # Update resources based on interactions with other agents
@@ -597,96 +637,102 @@ class TSMCAgent(CompanyAgent):
                 break
 
         # Buy resources from the tool manufacturer and silicon processing plant
-        self.buy_resources_from(tool_manufacturer, 'tools', 10)
-        self.buy_resources_from(silicon_processing_plant, 'silicon', 20)
+       # self.buy_resources_from(tool_manufacturer, 'tools', 10)
+        #self.buy_resources_from(silicon_processing_plant, 'silicon', 20)
 
         # Manufacture chips
-        self.manufacture_chips(10)
+        self.manufacture_chips()
 
 class ASMLAgent(CompanyAgent):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.type = 'ASML'
-        self.talent = random.randint(*self.data["CompanyAgent"]["ASML"]["talent_range"])
-        self.resources = self.data["CompanyAgent"]["ASML"]["initial_resources"].copy()
+        self.talent = random.randint(*self.company_data["ASML"]["talent_range"])
+        self.resources = self.company_data["ASML"]["initial_resources"].copy()
 
+    def manufacture_tools(self):
+        # Assuming that tools are manufactured using some resource, say 'raw_materials'
+        # You can adjust the rate according to your simulation's rules
+        if self.resources['money'] > 0:
+            self.resources['money'] -= 1
+            self.resources['tools'] += 1
+
+    def sell_tools_to(self, other_agent, quantity):
+        if self.resources['tools'] >= quantity:
+            # Calculate the cost of the tools (assuming each tool costs 20 money)
+            cost = quantity * 20
+
+            # Check if the other agent has enough money
+            if other_agent.resources["money"] >= cost:
+                # Subtract tools from ASML and add money
+                self.resources["tools"] -= quantity
+                self.resources["money"] += cost
+
+                # Subtract money from the other agent and add the tools
+                other_agent.resources["money"] -= cost
+                other_agent.resources['tools'] += quantity
+
+
+    def step(self):
+        # Manufacture tools
+        self.manufacture_tools()
+
+        # Sell tools to TSMC or any other interested agents in the model's schedule
+        for agent in self.model.schedule.agents:
+            if isinstance(agent, TSMCAgent) and self.resources['tools'] > 0:
+                self.sell_tools_to(agent, 1)  # Sell one tool at a time
 
 class MediaTekAgent(CompanyAgent):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.type = 'MediaTek'
-        self.talent = random.randint(*self.data["CompanyAgent"]["MediaTek"]["talent_range"])
-        self.resources = self.data["CompanyAgent"]["MediaTek"]["initial_resources"].copy()
+        self.talent = random.randint(*self.company_data["MediaTek"]["talent_range"])
+        self.resources = self.company_data["MediaTek"]["initial_resources"].copy()
 
 
 class SMICAgent(CompanyAgent):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.type = 'SMIC'
-        self.talent = random.randint(*self.data["CompanyAgent"]["SMIC"]["talent_range"])
-        self.resources = self.data["CompanyAgent"]["SMIC"]["initial_resources"].copy()
+        self.talent = random.randint(*self.company_data["SMIC"]["talent_range"])
+        self.resources = self.company_data["SMIC"]["initial_resources"].copy()
 
 class HuaHongAgent(CompanyAgent):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.type = 'HuaHong'
-        self.talent = random.randint(*self.data["CompanyAgent"]["HuaHong"]["talent_range"])
-        self.resources = self.data["CompanyAgent"]["HuaHong"]["initial_resources"].copy()
+        self.talent = random.randint(*self.company_data["HuaHong"]["talent_range"])
+        self.resources = self.company_data["HuaHong"]["initial_resources"].copy()
 
 class InfineonAgent(CompanyAgent):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.type = 'Infineon'
-        self.talent = random.randint(*self.data["CompanyAgent"]["Infineon"]["talent_range"])
-        self.resources = self.data["CompanyAgent"]["Infineon"]["initial_resources"].copy()
+        self.talent = random.randint(*self.company_data["Infineon"]["talent_range"])
+        self.resources = self.company_data["Infineon"]["initial_resources"].copy()
 
 class STMicroelectronicsAgent(CompanyAgent):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.type = 'STMicroelectronics'
-        self.talent = random.randint(*self.data["CompanyAgent"]["STMicroelectronics"]["talent_range"])
-        self.resources = self.data["CompanyAgent"]["STMicroelectronics"]["initial_resources"].copy()
+        self.talent = random.randint(*self.company_data["STMicroelectronics"]["talent_range"])
+        self.resources = self.company_data["STMicroelectronics"]["initial_resources"].copy()
 
 
 class RenesasAgent(CompanyAgent):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.type = 'Renesas'
-        self.talent = random.randint(*self.data["CompanyAgent"]["Renesas"]["talent_range"])
-        self.resources = self.data["CompanyAgent"]["Renesas"]["initial_resources"].copy()
+        self.talent = random.randint(*self.company_data["Renesas"]["talent_range"])
+        self.resources = self.company_data["Renesas"]["initial_resources"].copy()
 
 class SonyAgent(CompanyAgent):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.type = 'Sony'
-        self.talent = random.randint(*self.data["CompanyAgent"]["Sony"]["talent_range"])
-        self.resources = self.data["CompanyAgent"]["Sony"]["initial_resources"].copy()
+        self.talent = random.randint(*self.company_data["Sony"]["talent_range"])
+        self.resources = self.company_data["Sony"]["initial_resources"].copy()
 
 
 
-import unittest
 
-class TestChipTransaction(unittest.TestCase):
-    def setUp(self):
-        # Create a new Nvidia agent and TSMC agent with initial resources
-        self.nvidia = NvidiaAgent(resources={"money": 1000, "chips": 0})
-        self.tsmc = TSMCAgent(resources={"money": 0, "chips": 100})
-
-    def test_transaction(self):
-        # Nvidia places an order for 50 chips
-        self.nvidia.order_chips_from_TSMC(quantity=50)
-
-        # Check that money has been transferred from Nvidia to TSMC
-        self.assertEqual(self.nvidia.resources["money"], 950)
-        self.assertEqual(self.tsmc.resources["money"], 50)
-
-        # TSMC fulfills the order
-        self.tsmc.manufacture_chips()
-        self.tsmc.send_out_orders()
-
-        # Check that chips have been transferred from TSMC to Nvidia
-        self.assertEqual(self.nvidia.resources["chips"], 50)
-        self.assertEqual(self.tsmc.resources["chips"], 50)
-
-if __name__ == "__main__":
-    unittest.main()
