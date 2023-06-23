@@ -26,9 +26,8 @@ class TestChipTransaction(unittest.TestCase):
         # Check that money has decreased for Nvidia
         self.assertLess(self.nvidia.resources["money"], self.initial_money_nvidia)
 
-        # TSMC fulfills the order
+       
         self.tsmc.manufacture_chips()
-        self.tsmc.send_chips_to(self.nvidia, quantity=1)
 
         # Check that chips have increased for Nvidia
         self.assertGreater(self.nvidia.resources["chips"], self.initial_chips_nvidia)

@@ -14,7 +14,7 @@ CompanyAgent:
   competition_percentage: 0.1
   Nvidia:
     talent_range: [5, 10]
-    initial_resources: {'money': 100, 'chips': 100, 'tools': 2}
+    initial_resources: {'money': 500, 'chips': 100, 'tools': 2}
     # more Nvidia-specific configurations here...
   Intel:
     talent_range: [5, 10]

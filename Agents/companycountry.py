@@ -105,7 +105,7 @@ class CompanyAgent(Agent):
     def cooperate_with(self, other_agent):
         if (self.resources["money"] > self.cooperation_thresholds["money"] and self.cooperation_thresholds["chips"]):
             self.resources["money"] -= self.cooperation_thresholds["money"]
-            other_agent.resources["chips"] -= self.cooperation_thresholds["chips"]
+            #other_agent.resources["chips"] -= self.cooperation_thresholds["chips"]
 
             # Decrease anxiety score due to successful cooperation
             self.public_opinion -= 1
@@ -538,7 +538,8 @@ class NvidiaAgent(CompanyAgent):
 
         # Calculate quantity of chips to order
         # We'll use 10% of the available money, and 5 chips per point of capabilities
-        quantity = int(self.resources["money"] * 0.1) + self.capabilities_score * 5
+        #Nvidia will always order at least one chip
+        quantity = max(1, int(self.resources["money"] * 0.1) + self.capabilities_score * 5)
 
         # Calculate the cost of the chips (assuming 1 chip costs 10 money)
         cost = quantity * 10
@@ -547,9 +548,17 @@ class NvidiaAgent(CompanyAgent):
         if self.resources["money"] >= cost:
             # Subtract money from Nvidia
             self.resources["money"] -= cost
-
+        # Send the payment to TSMC
+            TSMC_agent.receive_payment(cost)
         # Place the order with TSMC
             TSMC_agent.receive_order(self, quantity)
+            print(f"Nvidia has ordered {quantity} chips from TSMC.")
+    
+    def receive_chips(self, quantity):
+        # Add the received chips to Nvidia's resources
+        self.resources['chips'] += quantity
+        # Print the new chips count
+        print(f"Nvidia now has {self.resources['chips']} chips.")
 
 
 
@@ -575,33 +584,53 @@ class TSMCAgent(CompanyAgent):
 
     def receive_order(self, ordering_agent, quantity):
         self.order_book.append((ordering_agent, quantity))  # Append the new order to the order book
-    
+        print(f"TSMC has received an order of {quantity} chips from {ordering_agent.type}.")
+
+    def receive_payment(self, amount):
+        # Add the received money to TSMC's resources
+        self.resources['money'] += amount
+        print(f"TSMC has received a payment of {amount} money.")
+
+
     def manufacture_chips(self):
         if len(self.order_book) == 0:  # If the order book is empty, there's nothing to manufacture
-            return
+            print(f"Order book is empty.")
+            return None
         
-        ordering_agent, quantity = self.order_book.popleft()  # Get the oldest order from the order book
+        ordering_agent, quantity = self.order_book[0]  # Get the oldest order from the order book
 
         # Check how many chips TSMC can manufacture with its current resources
         max_quantity = min(self.resources['silicon']//2, self.resources['tools'], quantity)
         
-        # If TSMC can't manufacture any chips, put the order back in the order book
-        if max_quantity == 0:
-            self.order_book.appendleft((ordering_agent, quantity))
-            return
+        # If TSMC can't manufacture any chips, return None
+        if max_quantity <= 0:
+            print(f"TSMC does not have enough resources to manufacture the {quantity} chips ordered by {ordering_agent.type}.")
+            return None
 
         # Subtract the used resources and add the manufactured chips
         self.resources['silicon'] -= max_quantity*2
         self.resources['tools'] -= max_quantity
         self.resources['chips'] += max_quantity
 
+        # Update the order in the order book or remove it if it's been completely fulfilled
+        if max_quantity < quantity:
+            self.order_book[0] = (ordering_agent, quantity - max_quantity)
+        else:
+            self.order_book.popleft()
+
+
         # Send the manufactured chips to the ordering agent
         self.send_chips_to(ordering_agent, max_quantity)
+        print(f"TSMC has manufactured {max_quantity} chips for {ordering_agent.type}.")
+        # Return the details of the order that's just been processed
+        return ordering_agent, max_quantity
+
 
     def send_chips_to(self, receiving_agent, quantity):
         # Subtract the chips from TSMC and add them to the receiving agent
         self.resources['chips'] -= quantity
-        receiving_agent.resources['chips'] += quantity
+        receiving_agent.receive_chips(quantity) 
+        print(f"TSMC has sent {quantity} chips to {receiving_agent.type}.")
 
     
     # def buy_resources_from(self, other_agent, resource_type, quantity):
@@ -622,23 +651,23 @@ class TSMCAgent(CompanyAgent):
 
             
     def step(self):
-        # Update resources based on interactions with other agents
-        # For simplicity, we'll just find the first ToolManufacturerAgent and SiliconProcessingAgent in the model's schedule
-        tool_manufacturer = None
-        silicon_processing_plant = None
-        for agent in self.model.schedule.agents:
-            if isinstance(agent, ASMLAgent) and tool_manufacturer is None:
-                tool_manufacturer = agent
-            elif isinstance(agent, ProcessingPlantAgent) and silicon_processing_plant is None:
-                silicon_processing_plant = agent
+    #     # Update resources based on interactions with other agents
+    #     # For simplicity, we'll just find the first ToolManufacturerAgent and SiliconProcessingAgent in the model's schedule
+    #     tool_manufacturer = None
+    #     silicon_processing_plant = None
+    #     for agent in self.model.schedule.agents:
+    #         if isinstance(agent, ASMLAgent) and tool_manufacturer is None:
+    #             tool_manufacturer = agent
+    #         elif isinstance(agent, ProcessingPlantAgent) and silicon_processing_plant is None:
+    #             silicon_processing_plant = agent
 
-            # If we found both agents, we can break the loop
-            if tool_manufacturer is not None and silicon_processing_plant is not None:
-                break
+    #         # If we found both agents, we can break the loop
+    #         if tool_manufacturer is not None and silicon_processing_plant is not None:
+    #             break
 
-        # Buy resources from the tool manufacturer and silicon processing plant
-       # self.buy_resources_from(tool_manufacturer, 'tools', 10)
-        #self.buy_resources_from(silicon_processing_plant, 'silicon', 20)
+    #     # Buy resources from the tool manufacturer and silicon processing plant
+    #    # self.buy_resources_from(tool_manufacturer, 'tools', 10)
+    #     #self.buy_resources_from(silicon_processing_plant, 'silicon', 20)
 
         # Manufacture chips
         self.manufacture_chips()
