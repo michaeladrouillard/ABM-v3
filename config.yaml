@@ -36,7 +36,7 @@ CompanyAgent:
 
 
 company_country_map:
-  US: [Nvidia, Intel]
+  US: [Nvidia, Intel, FabIntel]
   Taiwan: [TSMC, MediaTek]
   China: [SMIC, HuaHong]
   EU: [Infineon, STMicroelectronics, ASML]

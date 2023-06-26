@@ -1,4 +1,4 @@
-from Agents.companycountry import CountryAgent, CompanyAgent, NvidiaAgent, SMICAgent, InfineonAgent, RenesasAgent, TSMCAgent, IntelAgent, HuaHongAgent, STMicroelectronicsAgent, SonyAgent, MediaTekAgent, ASMLAgent, SumcoAgent
+from Agents.companycountry import CountryAgent, CompanyAgent, NvidiaAgent, SMICAgent, InfineonAgent, RenesasAgent, TSMCAgent, IntelAgent, HuaHongAgent, STMicroelectronicsAgent, SonyAgent, MediaTekAgent, ASMLAgent, SumcoAgent, FabIntel
 from Agents.communication import CommunicationChannel
 from Agents.resource import Resource
 from Agents.mine import MineAgent
@@ -31,6 +31,7 @@ class GameModel(Model):
     "ASML": ASMLAgent,
     "Nvidia": NvidiaAgent,
     "Intel": IntelAgent,
+    "FabIntel": FabIntel,
     "SMIC": SMICAgent,
     "HuaHong": HuaHongAgent,
     "Infineon": InfineonAgent,

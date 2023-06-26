@@ -18,8 +18,11 @@ CompanyAgent:
     # more Nvidia-specific configurations here...
   Intel:
     talent_range: [5, 10]
-    initial_resources: {'money': 100, 'chips': 100, 'services': 2}
+    initial_resources: {'money': 100, 'chips': 100, 'services': 2, 'wafers': 100}
     # more Nvidia-specific configurations here...
+  FabIntel:
+    talent_range: [7, 12]
+    initial_resources: {'money': 150, 'chips': 150, 'services': 500, 'wafers': 500}
   TSMC:
     talent_range: [7, 12]
     initial_resources: {'money': 150, 'chips': 150, 'services': 500, 'wafers': 500}
