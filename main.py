@@ -5,6 +5,7 @@ from tqdm import tqdm
 import cProfile
 
 
+
 def run_model(agent_dict):
     model = GameModel(agent_dict)
     for _ in tqdm(range(100), desc="Running model"):
@@ -38,6 +39,7 @@ def run_model(agent_dict):
  # Plot model data
     model_data.plot()
     plt.show()
+    model.visualize_network()
 def main():
 
     global agent_dict

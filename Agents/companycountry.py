@@ -4,7 +4,6 @@ from mesa.time import RandomActivation
 import yaml
 from collections import deque
 
-
 import random
 from mesa import Agent
 from mesa.time import RandomActivation
@@ -229,6 +228,21 @@ class CompanyAgent(Agent):
     
         self.send_public_message(self.evaluate_message_content('money'))
 
+    def buy_resources_from(self, other_agent, resource_type, quantity):
+        # Check if the other agent has enough of the resource
+        if other_agent.resources[resource_type] >= quantity:
+            # Calculate the cost of the resources (assuming each unit of resource costs 5 money)
+            cost = quantity * 5
+
+            # Check if TSMC has enough money
+            if self.resources["money"] >= cost:
+                # Subtract money from TSMC and add the resources
+                self.resources["money"] -= cost
+                self.resources[resource_type] += quantity
+
+                # Subtract the resources from the other agent and add the money
+                other_agent.resources[resource_type] -= quantity
+                other_agent.resources["money"] += cost
 
     def expected_gain_launch_project(self):
             # Assume that the expected gain from launching a project is proportional to the capabilities score
@@ -291,8 +305,8 @@ class CompanyAgent(Agent):
 
 
     def step(self):
-        #print(f'Step function called for agent {self.unique_id}')
         self.choose_action()
+ 
 
 
 class CountryAgent(Agent):
@@ -524,6 +538,19 @@ class NvidiaAgent(CompanyAgent):
         self.type = 'Nvidia'
         self.talent = random.randint(*self.company_data["Nvidia"]["talent_range"])
         self.resources = self.company_data["Nvidia"]["initial_resources"].copy()
+        self.chips_in_stock = 0
+        self.capabilities_score = 0
+        print(f"NvidiaAgent {self.unique_id} instantiated.")
+
+    def r_and_d(self):
+        # Calculate the increase in capabilities score based on money and talent
+        increase = self.resources["money"] * self.talent / 10
+        self.capabilities_score += increase
+
+        # Print the outcome
+        print(f"NvidiaAgent's capabilities score increased by {increase}.")
+        print(f"New capabilities score: {self.capabilities_score}")
+
 
     def order_chips_from_TSMC(self):
         # Find the TSMC agent in the model's schedule
@@ -539,7 +566,7 @@ class NvidiaAgent(CompanyAgent):
         # Calculate quantity of chips to order
         # We'll use 10% of the available money, and 5 chips per point of capabilities
         #Nvidia will always order at least one chip
-        quantity = max(1, int(self.resources["money"] * 0.1) + self.capabilities_score * 5)
+        quantity = max(1, int(self.resources["money"] * 0.1) + self.capabilities_score * 2)
 
         # Calculate the cost of the chips (assuming 1 chip costs 10 money)
         cost = quantity * 10
@@ -556,15 +583,33 @@ class NvidiaAgent(CompanyAgent):
     
     def receive_chips(self, quantity):
         # Add the received chips to Nvidia's resources
-        self.resources['chips'] += quantity
+        self.chips_in_stock += quantity
         # Print the new chips count
         print(f"Nvidia now has {self.resources['chips']} chips.")
 
+    def sell_chips(self, quantity):
+        if self.chips_in_stock >= quantity:
+            # Calculate the price of the chips (assuming 1 chip costs 20 money)
+            price = quantity * 20
 
+            # Subtract the chips from Nvidia's stock
+            self.chips_in_stock -= quantity
+
+            # Add money to Nvidia's resources
+            self.resources["money"] += price
+
+            print(f"Nvidia sold {quantity} chips for {price} money.")
+        else:
+            print("Insufficient chips in stock to fulfill the order.")
 
     def step(self):
-        # Decide when to order chips from TSMC
+        print(f'Step function called for Nvidia')
         self.order_chips_from_TSMC()
+        # Sell chips to anonymous company
+        quantity_to_sell = random.randint(1, 10)
+        self.sell_chips(quantity_to_sell)
+        self.r_and_d()
+
 
 class IntelAgent(CompanyAgent):
     def __init__(self, *args, **kwargs):
@@ -600,7 +645,7 @@ class TSMCAgent(CompanyAgent):
         ordering_agent, quantity = self.order_book[0]  # Get the oldest order from the order book
 
         # Check how many chips TSMC can manufacture with its current resources
-        max_quantity = min(self.resources['silicon']//2, self.resources['tools'], quantity)
+        max_quantity = min(self.resources['wafers']//2, self.resources['services'], quantity)
         
         # If TSMC can't manufacture any chips, return None
         if max_quantity <= 0:
@@ -608,8 +653,8 @@ class TSMCAgent(CompanyAgent):
             return None
 
         # Subtract the used resources and add the manufactured chips
-        self.resources['silicon'] -= max_quantity*2
-        self.resources['tools'] -= max_quantity
+        self.resources['wafers'] -= max_quantity*2
+        self.resources['services'] -= max_quantity
         self.resources['chips'] += max_quantity
 
         # Update the order in the order book or remove it if it's been completely fulfilled
@@ -633,43 +678,34 @@ class TSMCAgent(CompanyAgent):
         print(f"TSMC has sent {quantity} chips to {receiving_agent.type}.")
 
     
-    # def buy_resources_from(self, other_agent, resource_type, quantity):
-    #     # Check if the other agent has enough of the resource
-    #     if other_agent.resources[resource_type] >= quantity:
-    #         # Calculate the cost of the resources (assuming each unit of resource costs 5 money)
-    #         cost = quantity * 5
 
-    #         # Check if TSMC has enough money
-    #         if self.resources["money"] >= cost:
-    #             # Subtract money from TSMC and add the resources
-    #             self.resources["money"] -= cost
-    #             self.resources[resource_type] += quantity
+    ###buy resource should be called inside of manufacture chips. buy resources should be generic?
+    ###
 
-    #             # Subtract the resources from the other agent and add the money
-    #             other_agent.resources[resource_type] -= quantity
-    #             other_agent.resources["money"] += cost
 
             
     def step(self):
-    #     # Update resources based on interactions with other agents
-    #     # For simplicity, we'll just find the first ToolManufacturerAgent and SiliconProcessingAgent in the model's schedule
-    #     tool_manufacturer = None
-    #     silicon_processing_plant = None
-    #     for agent in self.model.schedule.agents:
-    #         if isinstance(agent, ASMLAgent) and tool_manufacturer is None:
-    #             tool_manufacturer = agent
-    #         elif isinstance(agent, ProcessingPlantAgent) and silicon_processing_plant is None:
-    #             silicon_processing_plant = agent
+        # Find the ASMLAgent and SUMCOAgent in the model's schedule
+        asml_agent = None
+        sumco_agent = None
+        for agent in self.model.schedule.agents:
+            if isinstance(agent, ASMLAgent) and asml_agent is None:
+                asml_agent = agent
+            elif isinstance(agent, SumcoAgent) and sumco_agent is None:
+                sumco_agent = agent
 
-    #         # If we found both agents, we can break the loop
-    #         if tool_manufacturer is not None and silicon_processing_plant is not None:
-    #             break
+            # If we found both agents, we can break the loop
+            if asml_agent is not None and sumco_agent is not None:
+                break
 
-    #     # Buy resources from the tool manufacturer and silicon processing plant
-    #    # self.buy_resources_from(tool_manufacturer, 'tools', 10)
-    #     #self.buy_resources_from(silicon_processing_plant, 'silicon', 20)
+        # Buy tools from the ASMLAgent
+        self.buy_resources_from(asml_agent, 'services', 10)
+        print(f"TSMC has bought services.")
 
-        # Manufacture chips
+        # Buy wafers from the SUMCOAgent
+        self.buy_resources_from(sumco_agent, 'wafers', 10)
+
+        # Manufacture chips and interact with ordering agents
         self.manufacture_chips()
 
 class ASMLAgent(CompanyAgent):
@@ -679,37 +715,44 @@ class ASMLAgent(CompanyAgent):
         self.talent = random.randint(*self.company_data["ASML"]["talent_range"])
         self.resources = self.company_data["ASML"]["initial_resources"].copy()
 
-    def manufacture_tools(self):
+    def manufacture_services(self):
         # Assuming that tools are manufactured using some resource, say 'raw_materials'
         # You can adjust the rate according to your simulation's rules
         if self.resources['money'] > 0:
             self.resources['money'] -= 1
-            self.resources['tools'] += 1
-
-    def sell_tools_to(self, other_agent, quantity):
-        if self.resources['tools'] >= quantity:
-            # Calculate the cost of the tools (assuming each tool costs 20 money)
-            cost = quantity * 20
-
-            # Check if the other agent has enough money
-            if other_agent.resources["money"] >= cost:
-                # Subtract tools from ASML and add money
-                self.resources["tools"] -= quantity
-                self.resources["money"] += cost
-
-                # Subtract money from the other agent and add the tools
-                other_agent.resources["money"] -= cost
-                other_agent.resources['tools'] += quantity
+            self.resources['services'] += 1
 
 
     def step(self):
-        # Manufacture tools
-        self.manufacture_tools()
+        # Manufacture services
+        self.manufacture_services()
 
-        # Sell tools to TSMC or any other interested agents in the model's schedule
-        for agent in self.model.schedule.agents:
-            if isinstance(agent, TSMCAgent) and self.resources['tools'] > 0:
-                self.sell_tools_to(agent, 1)  # Sell one tool at a time
+        # # Sell tools to TSMC or any other interested agents in the model's schedule
+        # for agent in self.model.schedule.agents:
+        #     if isinstance(agent, TSMCAgent) and self.resources['services'] > 0:
+        #         self.sell_services_to(agent, 5)  # Sell one tool at a time
+
+        # Print the current services supply
+        print(f"Asml's services supply: {self.resources['services']}")
+
+class SumcoAgent(CompanyAgent):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.type = 'Sumco'
+        self.talent = random.randint(*self.company_data["Sumco"]["talent_range"])
+        self.resources = self.company_data["Sumco"]["initial_resources"].copy()
+
+    def manufacture_wafers(self):
+        # Assuming that tools are manufactured using some resource, say 'raw_materials'
+        # You can adjust the rate according to your simulation's rules
+        if self.resources['money'] > 0:
+            self.resources['money'] -= 1
+            self.resources['wafers'] += 10
+
+    def step(self):
+        # Print the current wafer supply
+        print(f"Sumco's wafer supply: {self.resources['wafers']}")
+
 
 class MediaTekAgent(CompanyAgent):
     def __init__(self, *args, **kwargs):
@@ -754,6 +797,7 @@ class RenesasAgent(CompanyAgent):
         self.type = 'Renesas'
         self.talent = random.randint(*self.company_data["Renesas"]["talent_range"])
         self.resources = self.company_data["Renesas"]["initial_resources"].copy()
+
 
 class SonyAgent(CompanyAgent):
     def __init__(self, *args, **kwargs):

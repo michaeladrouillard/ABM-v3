@@ -14,19 +14,19 @@ CompanyAgent:
   competition_percentage: 0.1
   Nvidia:
     talent_range: [5, 10]
-    initial_resources: {'money': 500, 'chips': 100, 'tools': 2}
+    initial_resources: {'money': 10000, 'chips': 100, 'services': 2}#is the 100 redundant now that i have the chips in stock function?
     # more Nvidia-specific configurations here...
   Intel:
     talent_range: [5, 10]
-    initial_resources: {'money': 100, 'chips': 100, 'tools': 2}
+    initial_resources: {'money': 100, 'chips': 100, 'services': 2}
     # more Nvidia-specific configurations here...
   TSMC:
     talent_range: [7, 12]
-    initial_resources: {'money': 150, 'chips': 150, 'tools': 2, 'silicon': 5}
+    initial_resources: {'money': 150, 'chips': 150, 'services': 500, 'wafers': 500}
     # more TSMC-specific configurations here...
   ASML:
     talent_range: [7, 12]
-    initial_resources: {'money': 150, 'chips': 150, 'tools': 2}
+    initial_resources: {'money': 150, 'chips': 150, 'services': 2}
     # more TSMC-specific configurations here...
   MediaTek:
     talent_range: [7, 12]
@@ -55,7 +55,11 @@ CompanyAgent:
   HuaHong:
     talent_range: [7, 12]
     initial_resources: {'money': 150, 'chips': 150}
-    # more SMIC-specific configurations here...
+    # more Huahong-specific configurations here...
+  Sumco:
+    talent_range: [7, 12]
+    initial_resources: {'money': 150, 'chips': 0, 'wafers': 150}
+    # more Sumco-specific configurations here...
 CountryAgent: 
   initial_resources: 
     money: 100

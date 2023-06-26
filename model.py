@@ -1,4 +1,4 @@
-from Agents.companycountry import CountryAgent, CompanyAgent, NvidiaAgent, SMICAgent, InfineonAgent, RenesasAgent, TSMCAgent, IntelAgent, HuaHongAgent, STMicroelectronicsAgent, SonyAgent, MediaTekAgent, ASMLAgent 
+from Agents.companycountry import CountryAgent, CompanyAgent, NvidiaAgent, SMICAgent, InfineonAgent, RenesasAgent, TSMCAgent, IntelAgent, HuaHongAgent, STMicroelectronicsAgent, SonyAgent, MediaTekAgent, ASMLAgent, SumcoAgent
 from Agents.communication import CommunicationChannel
 from Agents.resource import Resource
 from Agents.mine import MineAgent
@@ -15,6 +15,7 @@ import random
 import numpy as np
 import networkx as nx
 import yaml
+import matplotlib.pyplot as plt
 
 class GameModel(Model):
     def __init__(self, agent_dict):
@@ -37,7 +38,8 @@ class GameModel(Model):
     "Renesas": RenesasAgent,
     "Sony": SonyAgent,
     "TSMC": TSMCAgent,
-    "MediaTek": MediaTekAgent,}
+    "MediaTek": MediaTekAgent,
+    "Sumco": SumcoAgent,}
 
 
         agent_id = 0
@@ -82,9 +84,7 @@ class GameModel(Model):
 
             self.schedule.add(company_agent)  # Add the company agent to the schedule
 
-    # Create a random network of agents
-        #G = nx.erdos_renyi_graph(n=self.num_agents, p=0.1)
-        #self.network = nx.relabel_nodes(G, dict(zip(range(self.num_agents), self.schedule.agents)))
+
 
         #Initialize a data collector
         self.datacollector = DataCollector(
@@ -99,17 +99,44 @@ class GameModel(Model):
     #def load_config(self, config_file):
         #with open(config_file, 'r') as f:
             #return yaml.safe_load(f)
-    
+        self.create_network(agent_dict["partnerships"])
         self.print_agents()
 
-    def check_invasion_condition(self):
-        """
-        Check the condition for invasion and update the invasion probability.
-        """
+    def create_network(self, partnerships):
+    # Create an empty graph
+        G = nx.Graph()
+
+    # Add nodes from your agents
         for agent in self.schedule.agents:
-            if isinstance(agent, CountryAgent) and agent.country == "China":
-                self.invasion_probability = max(0, 1 - agent.public_opinion / 10)
-                break
+            G.add_node(agent)
+
+    # Add edges based on partnerships
+        for partnership in partnerships:
+            company1, company2 = partnership
+         # Find agents corresponding to company1 and company2
+            agent1 = next((agent for agent in self.schedule.agents if isinstance(agent, CompanyAgent) and agent.company_name == company1), None)
+            agent2 = next((agent for agent in self.schedule.agents if isinstance(agent, CompanyAgent) and agent.company_name == company2), None)
+            if agent1 is not None and agent2 is not None:
+                G.add_edge(agent1, agent2)
+
+        self.network = G
+
+    def visualize_network(self):
+        plt.figure(figsize=(10, 10))
+        pos = nx.spring_layout(self.network)  # positions for all nodes
+
+        # nodes
+        nx.draw_networkx_nodes(self.network, pos, node_size=700)
+
+        # edges
+        nx.draw_networkx_edges(self.network, pos, width=2.0, edge_color='black')
+
+        # labels
+        #nx.draw_networkx_labels(self.network, pos, font_size=20, font_family='sans-serif')
+
+        plt.axis('off')
+        plt.show()
+
     def get_agent_by_id(self, unique_id):
       """Get an agent by its unique_id."""
       for agent in self.schedule.agents:
@@ -125,23 +152,3 @@ class GameModel(Model):
       '''Advance the model by one step.'''
       self.datacollector.collect(self) #collect data
       self.schedule.step()
-      self.check_invasion_condition()
-      #if a random number is less than the invasion probability (this is just a dummy stand in)
-      if np.random.random() < self.invasion_probability:
-        #set the flag that china invades taiwan
-        self.china_invades_taiwan = True
-
-    # # Find the Chinese mine and Japanese processing plant
-    #   chinese_mine = next((agent for agent in self.schedule.agents if isinstance(agent, MineAgent) and agent.country == "China"), None)
-    #   japanese_plant = next((agent for agent in self.schedule.agents if isinstance(agent, ProcessingPlantAgent) and agent.country == "Japan"), None)
-
-    #   if chinese_mine and japanese_plant:
-    #         # Determine how much silicon to send
-    #     transfer_amount = self.config["resource_transfer"]["China"]["Japan"]["silicon"]
-    #     amount = min(chinese_mine.resources["silicon"], transfer_amount)
-
-    #         # Transfer the silicon
-        
-    #         # The send_resources and receive_resources methods are not defined in this code
-    #     amount_sent = chinese_mine.send_resources(amount)
-    #     japanese_plant.receive_resources(amount_sent)
