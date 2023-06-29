@@ -41,6 +41,7 @@ company_country_map:
   China: [SMIC, HuaHong]
   EU: [Infineon, STMicroelectronics, ASML]
   Japan: [Renesas, Sony, Sumco]
+  SKorea: [Samsung, SamsungSub]
 
 
 partnerships:

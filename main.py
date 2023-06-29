@@ -8,7 +8,7 @@ import cProfile
 
 def run_model(agent_dict):
     model = GameModel(agent_dict)
-    for _ in tqdm(range(100), desc="Running model"):
+    for _ in tqdm(range(10), desc="Running model"):
         model.step()
    
 

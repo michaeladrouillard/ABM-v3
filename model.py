@@ -1,4 +1,4 @@
-from Agents.companycountry import CountryAgent, CompanyAgent, NvidiaAgent, SMICAgent, InfineonAgent, RenesasAgent, TSMCAgent, IntelAgent, HuaHongAgent, STMicroelectronicsAgent, SonyAgent, MediaTekAgent, ASMLAgent, SumcoAgent, FabIntel
+from Agents.companycountry import CountryAgent, CompanyAgent, NvidiaAgent, SMICAgent, InfineonAgent, RenesasAgent, TSMCAgent, IntelAgent, HuaHongAgent, STMicroelectronicsAgent, SonyAgent, MediaTekAgent, ASMLAgent, SumcoAgent, FabIntel, SamsungAgent, CustomerAgent, SamsungSub
 from Agents.communication import CommunicationChannel
 from Agents.resource import Resource
 from Agents.mine import MineAgent
@@ -40,7 +40,9 @@ class GameModel(Model):
     "Sony": SonyAgent,
     "TSMC": TSMCAgent,
     "MediaTek": MediaTekAgent,
-    "Sumco": SumcoAgent,}
+    "Sumco": SumcoAgent,
+    "Samsung": SamsungAgent,
+    "SamsungSub": SamsungSub,}
 
 
         agent_id = 0
@@ -86,7 +88,15 @@ class GameModel(Model):
             self.schedule.add(company_agent)  # Add the company agent to the schedule
 
 
+        num_customers = 5  # Adjust this value to change the number of customers
 
+        for _ in range(num_customers):
+            # Create a CustomerAgent
+            customer_agent = CustomerAgent(agent_id, self)
+            agent_id += 1  # Increment the agent ID
+
+            self.schedule.add(customer_agent) 
+            
         #Initialize a data collector
         self.datacollector = DataCollector(
             model_reporters={"Total Money": lambda m: sum(a.resources["money"] for a in m.schedule.agents),
@@ -153,3 +163,53 @@ class GameModel(Model):
       '''Advance the model by one step.'''
       self.datacollector.collect(self) #collect data
       self.schedule.step()
+
+
+# from mesa.visualization.modules import CanvasGrid, ChartModule
+# from mesa.visualization.ModularVisualization import ModularServer
+
+# def agent_portrayal(agent):
+#     if isinstance(agent, CountryAgent):
+#         portrayal = {"Shape": "circle",
+#                      "Filled": "true",
+#                      "Color": "blue",
+#                      "Layer": 0,
+#                      "r": 0.5}
+#     elif isinstance(agent, CompanyAgent):
+#         portrayal = {"Shape": "rect",
+#                      "Filled": "true",
+#                      "Color": "green",
+#                      "Layer": 1,
+#                      "w": 0.5,
+#                      "h": 0.5}
+#     elif isinstance(agent, MineAgent):
+#         portrayal = {"Shape": "circle",
+#                      "Filled": "true",
+#                      "Color": "brown",
+#                      "Layer": 1,
+#                      "r": 0.3}
+#     elif isinstance(agent, ProcessingPlantAgent):
+#         portrayal = {"Shape": "rect",
+#                      "Filled": "true",
+#                      "Color": "yellow",
+#                      "Layer": 1,
+#                      "w": 0.3,
+#                      "h": 0.3}
+#     return portrayal
+
+
+# grid = CanvasGrid(agent_portrayal, 10, 10, 500, 500)
+
+
+# chart = ChartModule([{"Label": "Total Money", "Color": "Black"},
+#                      {"Label": "Total Chips", "Color": "Blue"}])
+
+# with open("config.yaml", 'r') as stream:
+#     agent_dict = yaml.safe_load(stream)
+
+# server = ModularServer(GameModel,
+#                        [grid, chart],
+#                        "Game Model",
+#                        {"agent_dict": agent_dict})  # Assuming agent_dict has been defined earlier.
+
+# server.launch()
