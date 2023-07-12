@@ -8,45 +8,8 @@ import random
 from mesa import Agent
 from mesa.time import RandomActivation
 import yaml
+import numpy as np
 
-class ProcessingPlantAgent(Agent):
-    def __init__(self, unique_id, model, country_agent):
-        super().__init__(unique_id, model)
-        self.country_agent = country_agent
-        self.country = country_agent.country 
-        self.public_opinion  = 0
-        # Load yaml file
-        with open('Agents/agent_config.yaml') as yaml_file:
-            data = yaml.safe_load(yaml_file)
-
-
-        plant_data = data["ProcessingPlantAgent"]
-
-        # Set initial resources based on the JSON file
-        self.resources = plant_data["initial_resources"]
-
-    def report(self):
-        return {'Resources': self.resources,}
-
-    def process(self):
-        # A simple processing model
-        if self.country_agent.resources["silicon"] > 0:
-            processed = self.country_agent.resources["silicon"] * self.country_agent.processing_capacity
-            self.country_agent.resources["silicon"] -= processed
-            self.country_agent.resources["chips"] += processed * 10  # Assume each unit of silicon gives 10 chips
-    
-    def receive_resources(self, amount):
-        self.resources["silicon"] += amount
-    
-    def receive_message(self, message):   
-        if "More Money" in message:
-            self.public_opinion += self.model.communication_channels["Twitter"].distortion if "Twitter" in message else self.model.communication_channels["Press Conference"].distortion
-        elif "Less Money" in message:
-            self.public_opinion -= self.model.communication_channels["Twitter"].distortion if "Twitter" in message else self.model.communication_channels["Press Conference"].distortion
-
-
-    def step(self):
-        self.process()
 
 class CompanyAgent(Agent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -61,6 +24,9 @@ class CompanyAgent(Agent):
         self.talent = random.randint(*self.company_data["talent_range"]) 
         self.resources = self.company_data["initial_resources"].copy()
         self.prev_resources = self.resources.copy() 
+        self.money_history = []  # List to keep track of money over time
+        self.lookback_steps = self.company_data["lookback_steps"]  # Lookback steps for trend analysis
+        self.optimization_horizon = 1  # Initialize optimization horizon as 1
         self.country_agent = country_agent 
         self.company_name = company_name  
         self.capabilities_score = 0
@@ -74,8 +40,27 @@ class CompanyAgent(Agent):
         self.project_launch_cost = self.company_data["project_launch_cost"]
         self.government_lobby_talent_threshold = self.company_data["government_lobby_talent_threshold"]
         self.competition_percentage = self.company_data["competition_percentage"]
-        #print(f'Created CompanyAgent with id {self.unique_id}')
+        self.history = {"launch_project": [], "lobby_government": [], "cooperate_with_country": [], "cooperate_with_company": [], "compete_with_company": []}
+        print(f'Initialized company {self.company_name}, country_agent type: {type(self.country_agent)}')
+
     
+    def update_trend_and_horizon(self):
+        # Update the money history
+        if len(self.money_history) >= self.lookback_steps:
+            self.money_history.pop(0)  # Remove the oldest value if we've reached the desired history length
+        self.money_history.append(self.resources["money"])  # Add the current money value
+
+        # Calculate the trend based on differences in money
+        diff = [j-i for i, j in zip(self.money_history[:-1], self.money_history[1:])]
+
+        # Based on the trend, set the optimization horizon
+        if all(d < 0 for d in diff):  # All differences are negative, money is decreasing
+            self.optimization_horizon = 1  # Optimize for the next step
+        elif all(d >= 0 for d in diff):  # All differences are non-negative, money is increasing or stable
+            self.optimization_horizon = self.lookback_steps  # Optimize further into the future
+        else:  # Mixed trend
+            self.optimization_horizon = 1  # You can set this based on your preference
+
     def add_partner(self, partner):
         """
         Add a partner to this company's list of partners.
@@ -93,9 +78,6 @@ class CompanyAgent(Agent):
     def report(self):
         return {'Talent': self.talent,
                 'Company Name': self.company_name,}
-
-    def get_country(self):
-        return self.country_agent.country
 
     def increase_capabilities(self):
       #increase capabilities score
@@ -151,9 +133,9 @@ class CompanyAgent(Agent):
 
         # Update public opinion score based on the message content
         if "More Money" in message or "More Chips" in message:
-            self.public_opinion -= 1 * influence_factor
-        elif "Less Money" in message or "Less Chips" in message:
             self.public_opinion += 1 * influence_factor
+        elif "Less Money" in message or "Less Chips" in message:
+            self.public_opinion -= 1 * influence_factor
 
 
     def evaluate_message_content(self, message_type):
@@ -177,6 +159,8 @@ class CompanyAgent(Agent):
 
 
     def launch_project(self):
+        previous_money = self.resources["money"]
+        previous_chips = self.resources["chips"]
         if self.resources["money"] >= self.project_launch_cost:  # Assuming launching a project requires 30 money
             self.resources["money"] -= self.project_launch_cost
             self.increase_capabilities()  # Launching a project increases capabilities
@@ -190,6 +174,8 @@ class CompanyAgent(Agent):
                     agent.public_opinion += self.capabilities_score * 0.01  # Using capabilities score as a factor
             for channel in self.model.communication_channels.keys():
                 self.send_public_message(self.evaluate_message_content('money'))
+            net_change = self.resources["money"] - previous_money, self.resources["chips"] - previous_chips
+            self.history["launch_project"].append(net_change)
             return True  # Successfully launched project
         else:
             # Increase own PO and country level if project fails
@@ -197,23 +183,23 @@ class CompanyAgent(Agent):
             self.public_opinion += 1 
             for channel in self.model.communication_channels.keys():
                 self.send_public_message(self.evaluate_message_content('money'))
-
+            net_change = self.resources["money"] - previous_money, self.resources["chips"] - previous_chips
+            self.history["launch_project"].append(net_change)
             return False  # Failed to launch project due to insufficient money
-       
+
 
     def lobby_government(self):
-        if self.talent >=self.government_lobby_talent_threshold:  # Lobbying government requires talent score >= 5
-            # Lobbying government might increase resources
-            self.resources["money"] += random.randint(10, 20)  # Increase in money
-            self.resources["chips"] += random.randint(5, 10)  # Increase in chips
-            for channel in self.model.communication_channels.keys():
-                self.send_public_message(self.evaluate_message_content('money'))
+        print(f'Lobbying government, type of self.country_agent: {type(self.country_agent)}')
+        if self.talent >= self.government_lobby_talent_threshold:  # Lobbying government requires talent score >= 5
+            # Request the government for resources
+            potential_gain = random.randint(10, 20), random.randint(5, 10)  # Potential increase in money and chips
+            self.country_agent.receive_lobby_request(self, potential_gain)
             return True  # Successfully lobbied government
-        for channel in self.model.communication_channels.keys():
-            self.send_public_message(self.evaluate_message_content('money'))
         return False  # Failed to lobby government due to insufficient talent
 
     def compete_with(self, other_company):
+        previous_money = self.resources["money"]
+        previous_chips = self.resources["chips"]
         # Companies compete based on their capabilities
         if self.capabilities_score > other_company.capabilities_score:
             # Winning company takes some resources from the losing company
@@ -221,12 +207,43 @@ class CompanyAgent(Agent):
             other_company.resources["money"] *= 0.9  # Loses 10% of money
             for channel in self.model.communication_channels.keys():
                 self.send_public_message(self.evaluate_message_content('money'))
+            net_change = self.resources["money"] - previous_money, self.resources["chips"] - previous_chips
+            self.history["compete_with_company"].append((other_company.unique_id, net_change))
             return True  # This company wins
         for channel in self.model.communication_channels.keys():
             self.send_public_message(self.evaluate_message_content('money'))
+        net_change = self.resources["money"] - previous_money, self.resources["chips"] - previous_chips
+        self.history["compete_with_company"].append((other_company.unique_id, net_change))
+        self.send_public_message(self.evaluate_message_content('money'))      
         return False  # This company loses
-    
-        self.send_public_message(self.evaluate_message_content('money'))
+
+
+    def expected_gain_compete_with(self, other_company):
+        if self.history["compete_with_company"]:
+            compete_with_same_company_history = [(company_id, net_money + net_chips) for company_id, (net_money, net_chips) in self.history["compete_with_company"] if company_id == other_company.unique_id]
+            if compete_with_same_company_history:
+                # Compute a weighted average of past gains, with more recent gains weighted more heavily
+                weights = [i+1 for i in range(len(compete_with_same_company_history))]
+                avg_past_gain = sum(gain * weight for (_, gain), weight in zip(compete_with_same_company_history, weights)) / sum(weights)  
+                # The win rate is the percentage of past competitions that resulted in a gain
+                win_rate = sum(1 for _, net_change in compete_with_same_company_history if net_change > 0) / len(compete_with_same_company_history)
+            else:
+                avg_past_gain = 0
+                win_rate = 0.5
+        else:
+            avg_past_gain = 0
+            win_rate = 0.5
+
+        potential_gain = other_company.resources["money"] * 0.1
+        expected_gain = win_rate * potential_gain + avg_past_gain
+        noise = np.random.normal(0, abs(expected_gain) * 0.1)  # Assuming the standard deviation is 10% of the expected gain
+        expected_gain += noise
+        if self.capabilities_score < other_company.capabilities_score:
+            expected_gain *= 0.5
+
+        return expected_gain
+
+
 
     def buy_resources_from(self, other_agent, resource_type, quantity):
         # Check if the other agent has enough of the resource
@@ -245,26 +262,68 @@ class CompanyAgent(Agent):
                 other_agent.resources["money"] += cost
 
     def expected_gain_launch_project(self):
-            # Assume that the expected gain from launching a project is proportional to the capabilities score
-         # and the number of chips
-        if self.resources["money"] >= self.project_launch_cost:
-            return self.capabilities_score * 2 + self.resources["chips"]
+        # Adjust the expected gain based on the average outcome of previous launches
+        if self.history["launch_project"]:
+            # Compute a weighted average of past gains, with more recent gains weighted more heavily
+            weights = [i+1 for i in range(len(self.history["launch_project"]))]
+            avg_past_gain = sum((net_money + net_chips) * weight for (net_money, net_chips), weight in zip(self.history["launch_project"], weights)) / sum(weights)
+        
+            # The expected gain is the average past gain
+            expected_gain = avg_past_gain
         else:
-            return 0
+            # If there's no history of launching projects, the expected gain is 0
+            expected_gain = 0
+
+        # Adding a noise term that follows a normal distribution
+        noise = np.random.normal(0, abs(expected_gain) * 0.1)  # Assuming the standard deviation is 10% of the expected gain
+        expected_gain += noise
+
+        return expected_gain
+
+
 
     def expected_gain_lobby_government(self):
-        # Assume that the expected gain from lobbying the government is proportional to the talent
         if self.resources["money"] <= self.government_lobby_money_threshold and self.talent > self.government_lobby_talent_threshold:
-            return self.talent * 2  # The number 2 is arbitrary and can be adjusted
+            if self.history["lobby_government"]:
+                # Compute a weighted average of past gains, with more recent gains weighted more heavily
+                weights = [i+1 for i in range(len(self.history["lobby_government"]))]
+                avg_past_gain = sum((net_money + net_chips) * weight for (net_money, net_chips), weight in zip(self.history["lobby_government"], weights)) / sum(weights)
+            
+                # The expected gain is the average past gain adjusted by the talent
+                expected_gain = avg_past_gain * self.talent * 2
+            else:
+                # If there's no history of lobbying government, the expected gain is 0
+                expected_gain = 0
+
+            # Adding a noise term that follows a normal distribution
+            noise = np.random.normal(0, abs(expected_gain) * 0.1)  # Assuming the standard deviation is 10% of the expected gain
+            expected_gain += noise
+
+            return expected_gain
         else:
             return 0
 
     def expected_gain_cooperate_with(self, other):
-        # Assume that the expected gain from cooperation is proportional to the sum of the agent's and the other agent's resources
-        if (self.resources["money"] > self.cooperation_thresholds["money"] and self.resources["chips"] > self.cooperation_thresholds["chips"]):
-            return sum(self.resources.values()) + sum(other.resources.values())
+        if self.resources["money"] > self.cooperation_thresholds["money"] and self.resources["chips"] > self.cooperation_thresholds["chips"]:
+            if self.history["cooperate_with_country"]:
+                # Compute a weighted average of past gains, with more recent gains weighted more heavily
+                weights = [i+1 for i in range(len(self.history["cooperate_with_country"]))]
+                avg_past_gain = sum((net_money + net_chips) * weight for (net_money, net_chips), weight in zip(self.history["cooperate_with_country"], weights)) / sum(weights)
+            
+                # The expected gain is the average past gain adjusted by the sum of resources
+                expected_gain = avg_past_gain * (sum(self.resources.values()) + sum(other.resources.values()))
+            else:
+                # If there's no history of cooperation with the country, the expected gain is 0
+                expected_gain = 0
+
+            # Adding a noise term that follows a normal distribution
+            noise = np.random.normal(0, abs(expected_gain) * 0.1)  # Assuming the standard deviation is 10% of the expected gain
+            expected_gain += noise
+
+            return expected_gain
         else:
             return 0
+
 
 
     def choose_action(self):
@@ -286,14 +345,20 @@ class CompanyAgent(Agent):
         money_factor = 1 + (average_money - self.resources["money"]) / average_money if average_money > 0 else 1
         chips_factor = 1 + (average_chips - self.resources["chips"]) / average_chips if average_chips > 0 else 1
 
+        # Risky actions
+        risky_actions_multiplier = 1 if self.optimization_horizon > 1 else 0.5
+        safe_actions_multiplier = 1 if self.optimization_horizon > 1 else 1.5
+
+
         actions = {
-            'launch_project': (self.expected_gain_launch_project() * money_factor * chips_factor, self.launch_project),
-            'lobby_government': (self.expected_gain_lobby_government() * money_factor, self.lobby_government),
-            'cooperate_with_country': (self.expected_gain_cooperate_with(self.country_agent) * money_factor * chips_factor, self.cooperate_with, self.country_agent),
-            'cooperate_with_company': (other_company and self.expected_gain_cooperate_with(other_company) * money_factor * chips_factor, self.cooperate_with, other_company)
+            'launch_project': (self.expected_gain_launch_project() * money_factor * chips_factor * risky_actions_multiplier, self.launch_project),
+            'lobby_government': (self.expected_gain_lobby_government() * money_factor * safe_actions_multiplier, self.lobby_government),
+            'cooperate_with_country': (self.expected_gain_cooperate_with(self.country_agent) * money_factor * chips_factor * safe_actions_multiplier, self.cooperate_with, self.country_agent),
+            'cooperate_with_company': (other_company and self.expected_gain_cooperate_with(other_company) * money_factor * chips_factor * safe_actions_multiplier, self.cooperate_with, other_company),
+            'compete_with_company': (other_company and self.expected_gain_compete_with(other_company) * money_factor * chips_factor * risky_actions_multiplier, self.compete_with, other_company)
         }
 
-    # Choose the action with the highest expected gain
+        # Choose the action with the highest expected gain
         best_action, best_value = max(actions.items(), key=lambda item: item[1][0] if item[1] else -1)
 
         if best_value and len(best_value) == 3:  # If the action requires another agent, call the action with the other agent as an argument
@@ -306,7 +371,8 @@ class CompanyAgent(Agent):
 
     def step(self):
         self.choose_action()
- 
+        self.prev_resources = self.resources.copy()
+        self.update_trend_and_horizon()
 
 
 class CountryAgent(Agent):
@@ -330,6 +396,8 @@ class CountryAgent(Agent):
         self.silicon_export_rate = silicon_export_rate
         self.processing_capacity = processing_capacity # Copy of resource levels at the previous time step
         self.research_capacity = 0
+        self.lobby_requests = {}  # A dictionary to hold the lobby requests of company agents
+
 
         self.decision_thresholds = country_data["decision_thresholds"]
         self.cooperation_thresholds = country_data["cooperation_thresholds"]
@@ -346,7 +414,7 @@ class CountryAgent(Agent):
     
     def set_company(self, company_agent):
         self.company = company_agent  # Associate a CompanyAgent with this CountryAgent
-        self.gdp = self.calculate_gdp()  # Update GDP after company agent is set
+        company_agent.country_agent = self
 
     
     def calculate_gdp(self):
@@ -361,6 +429,12 @@ class CountryAgent(Agent):
         country_resources = self.resources["money"] + self.resources["chips"]
         return company_resources + country_resources + company_cap_score
 
+    def receive_lobby_request(self, company, potential_gain):
+         self.lobby_requests[company] = {
+            "potential_gain": potential_gain,
+            "steps_remaining": 5  # or however many steps we want the delay to be
+        }
+         
     def approve_project(self, project_cost):
         self.debt += project_cost
 
@@ -490,6 +564,37 @@ class CountryAgent(Agent):
 
         return True  # Successfully formed an alliance
 
+    def process_lobby_requests(self):
+        for company, request_info in list(self.lobby_requests.items()):
+            request_info["steps_remaining"] -= 1
+            if request_info["steps_remaining"] > 0:
+                continue  # Skip this request if it's not ready to be processed yet
+
+            print(f'Processing request for {company}: {request_info}')
+            money_gain, chips_gain = request_info["potential_gain"]
+
+
+            # Evaluating feasibility: in this case, checking if the country has enough resources
+            is_feasible = self.resources["money"] >= money_gain and self.resources["chips"] >= chips_gain
+
+            if not is_feasible:
+                continue  # Skip this request if it's not feasible
+
+            # Decision-making: probabilistic
+            approval_probability = np.random.uniform(0, 1)  # Random float between 0 and 1
+            if approval_probability < 0.7:  # 50% chance of approval
+                self.resources["money"] -= money_gain  # Decrease the country's resources
+                self.resources["chips"] -= chips_gain
+                company.resources["money"] += money_gain  # Increase the company's resources
+                company.resources["chips"] += chips_gain
+                print(f'Processed request for {company}: {request_info}, approval probability: {approval_probability}')
+            else:
+                print(f'Request not approved for {company}: {request_info}, approval probability: {approval_probability}')
+            del self.lobby_requests[company]  # Remove processed requests
+
+
+
+
     def choose_action(self):
         # Find all other country agents
         other_countries = [agent for agent in self.model.schedule.agents if isinstance(agent, CountryAgent) and agent is not self]
@@ -528,13 +633,14 @@ class CountryAgent(Agent):
 
 
     def step(self):
+        self.process_lobby_requests()
         self.choose_action()
         self.prev_resources = self.resources.copy()  # Save current resource levels for the next time step
         self.gdp = self.calculate_gdp()
     
 class NvidiaAgent(CompanyAgent):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, unique_id, model, country_agent, company_name):
+        super().__init__(unique_id, model, country_agent, company_name)
         self.type = 'Nvidia'
         self.talent = random.randint(*self.company_data["Nvidia"]["talent_range"])
         self.resources = self.company_data["Nvidia"]["initial_resources"].copy()
@@ -612,8 +718,8 @@ class NvidiaAgent(CompanyAgent):
 
 
 class IntelAgent(CompanyAgent):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, unique_id, model, country_agent, company_name):
+        super().__init__(unique_id, model, country_agent, company_name)
         self.type = 'Intel'
         self.talent = random.randint(*self.company_data["Intel"]["talent_range"])
         self.resources = self.company_data["Intel"]["initial_resources"].copy()
@@ -676,7 +782,7 @@ class IntelAgent(CompanyAgent):
         else:
             print("Insufficient chips in stock to fulfill the order.")
     def step(self):
-        print(f'Step function called for Nvidia')
+        print(f'Step function called for Intel')
         self.order_chips_from_fabintel()
         # Sell chips to anonymous company
         quantity_to_sell = random.randint(1, 10)
@@ -685,8 +791,8 @@ class IntelAgent(CompanyAgent):
 
 
 class FabIntel(IntelAgent):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, unique_id, model, country_agent, company_name):
+        super().__init__(unique_id, model, country_agent, company_name)
         self.type = 'FabIntel'
         self.order_book = deque()
         # Additional attributes or modifications specific to DesignIntel
@@ -738,15 +844,15 @@ class FabIntel(IntelAgent):
     def step(self):
         # Find the ASMLAgent and SUMCOAgent in the model's schedule
         asml_agent = None
-        sumco_agent = None
+        siltronic_agent = None
         for agent in self.model.schedule.agents:
             if isinstance(agent, ASMLAgent) and asml_agent is None:
                 asml_agent = agent
-            elif isinstance(agent, SumcoAgent) and sumco_agent is None:
-                sumco_agent = agent
+            elif isinstance(agent, SiltronicAgent) and siltronic_agent is None:
+                siltronic_agent = agent
 
             # If we found both agents, we can break the loop
-            if asml_agent is not None and sumco_agent is not None:
+            if asml_agent is not None and siltronic_agent is not None:
                 break
 
         # Buy tools from the ASMLAgent
@@ -754,14 +860,14 @@ class FabIntel(IntelAgent):
         #print(f"TSMC has bought services.")
 
         # Buy wafers from the SUMCOAgent
-        self.buy_resources_from(sumco_agent, 'wafers', 10)
+        self.buy_resources_from(siltronic_agent, 'wafers', 10)
 
         # Manufacture chips and interact with ordering agents
         self.manufacture_chips()
 
 class TSMCAgent(CompanyAgent):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, unique_id, model, country_agent, company_name):
+        super().__init__(unique_id, model, country_agent, company_name)
         self.type = 'TSMC'
         self.talent = random.randint(*self.company_data["TSMC"]["talent_range"])
         self.resources = self.company_data["TSMC"]["initial_resources"].copy()
@@ -843,8 +949,8 @@ class TSMCAgent(CompanyAgent):
         self.manufacture_chips()
 
 class ASMLAgent(CompanyAgent):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, unique_id, model, country_agent, company_name):
+        super().__init__(unique_id, model, country_agent, company_name)
         self.type = 'ASML'
         self.talent = random.randint(*self.company_data["ASML"]["talent_range"])
         self.resources = self.company_data["ASML"]["initial_resources"].copy()
@@ -869,9 +975,57 @@ class ASMLAgent(CompanyAgent):
         # Print the current services supply
         print(f"Asml's services supply: {self.resources['services']}")
 
+class FujimiAgent(CompanyAgent):
+    def __init__(self, unique_id, model, country_agent, company_name):
+        super().__init__(unique_id, model, country_agent, company_name)
+        self.type = 'Fujimi'
+        self.talent = random.randint(*self.company_data["Fujimi"]["talent_range"])
+        self.resources = self.company_data["Fujimi"]["initial_resources"].copy()
+
+    def manufacture_services(self):
+        if self.resources['money'] > 0:
+            self.resources['money'] -= 1
+            self.resources['services'] += 1
+
+
+    def step(self):
+        self.manufacture_services()
+        print(f"Fujimi's services supply: {self.resources['services']}")
+
+class SiltronicAgent(CompanyAgent):
+    def __init__(self, unique_id, model, country_agent, company_name):
+        super().__init__(unique_id, model, country_agent, company_name)
+        self.type = 'Siltronic'
+        self.talent = random.randint(*self.company_data["Siltronic"]["talent_range"])
+        self.resources = self.company_data["Siltronic"]["initial_resources"].copy()
+
+    def manufacture_wafers(self):
+        # Assuming that tools are manufactured using some resource, say 'raw_materials'
+        # You can adjust the rate according to your simulation's rules
+        if self.resources['money'] > 0:
+            self.resources['money'] -= 1
+            self.resources['wafers'] += 10
+
+    def step(self):
+        # Print the current wafer supply
+        print(f"Siltronic's wafer supply: {self.resources['wafers']}")
+        fujimi_agent = None
+        for agent in self.model.schedule.agents:
+            if isinstance(agent, FujimiAgent) and fujimi_agent is None:
+                fujimi_agent = agent
+            # If we found both agents, we can break the loop
+            if fujimi_agent is not None:
+                break
+        # Buy tools from the fujimi Agent
+        self.buy_resources_from(fujimi_agent, 'services', 10)
+
+
+
+
+
 class SumcoAgent(CompanyAgent):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, unique_id, model, country_agent, company_name):
+        super().__init__(unique_id, model, country_agent, company_name)
         self.type = 'Sumco'
         self.talent = random.randint(*self.company_data["Sumco"]["talent_range"])
         self.resources = self.company_data["Sumco"]["initial_resources"].copy()
@@ -888,6 +1042,57 @@ class SumcoAgent(CompanyAgent):
         print(f"Sumco's wafer supply: {self.resources['wafers']}")
 
 
+class SKSiltronAgent(CompanyAgent):
+    def __init__(self, unique_id, model, country_agent, company_name):
+        super().__init__(unique_id, model, country_agent, company_name)
+        self.type = 'SKSiltron'
+        self.talent = random.randint(*self.company_data["SKSiltron"]["talent_range"])
+        self.resources = self.company_data["SKSiltron"]["initial_resources"].copy()
+
+    def manufacture_wafers(self):
+        # Assuming that tools are manufactured using some resource, say 'raw_materials'
+        # You can adjust the rate according to your simulation's rules
+        if self.resources['money'] > 0 and self.resources['silicon'] > 0:
+            self.resources['money'] -= 1
+            self.resources['silicon'] -= 1
+            self.resources['wafers'] += 10
+
+    def step(self):
+        # Print the current wafer supply
+        print(f"SKSiltron's wafer supply: {self.resources['wafers']}")
+        self.manufacture_wafers()
+        shinetsu_agent = None
+        for agent in self.model.schedule.agents:
+            if isinstance(agent, ShinEtsuAgent) and shinetsu_agent is None:
+                shinetsu_agent = agent
+            # If we found both agents, we can break the loop
+            if shinetsu_agent is not None:
+                break
+        # Buy tools from the fujimi Agent
+        self.buy_resources_from(shinetsu_agent, 'silicon', 10)
+
+
+class ShinEtsuAgent(CompanyAgent):
+    def __init__(self, unique_id, model, country_agent, company_name):
+        super().__init__(unique_id, model, country_agent, company_name)
+        self.type = 'ShinEtsu'
+        self.talent = random.randint(*self.company_data["ShinEtsu"]["talent_range"])
+        self.resources = self.company_data["ShinEtsu"]["initial_resources"].copy()
+
+    def process_silicon(self):
+        # Assuming that tools are manufactured using some resource, say 'raw_materials'
+        # You can adjust the rate according to your simulation's rules
+        if self.resources['money'] > 0:
+            self.resources['money'] -= 1
+            self.resources['silicon'] += 10
+
+    def step(self):
+        # Print the current wafer supply
+        print(f"ShinEtsu's silicon supply: {self.resources['silicon']}")
+        self.process_silicon()
+
+
+
 class CustomerAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent=None, company_name="general", **kwargs):
         super().__init__(unique_id, model, country_agent, company_name, **kwargs)
@@ -895,6 +1100,7 @@ class CustomerAgent(CompanyAgent):
         # Add initial resources for CustomerAgent
         self.talent = random.randint(*self.company_data["CustomerAgent"]["talent_range"])
         self.resources = self.company_data["CustomerAgent"]["initial_resources"].copy()
+        self.initial_money = self.resources['money']  
         print(f"Customer agent {self.unique_id} created.")
 
     def place_order(self, quantity, manufacturing_agents):
@@ -916,6 +1122,7 @@ class CustomerAgent(CompanyAgent):
             print(f"{self.type} does not have enough money to pay {amount} to {manufacturing_agent.type}.")
 
     def step(self):
+        self.resources['money'] = self.initial_money  # Replenish money at the start of each step
         # Collect all manufacturing agents in the model's schedule
         manufacturing_agents = []
         for agent in self.model.schedule.agents:
@@ -932,17 +1139,17 @@ class CustomerAgent(CompanyAgent):
         self.pay_for_order(random.choice(manufacturing_agents), payment_amount)
 
 class SamsungAgent(CompanyAgent):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, unique_id, model, country_agent, company_name):
+        super().__init__(unique_id, model, country_agent, company_name)
         self.type = 'Samsung'
     def receive_payment(self, amount):
         # Add the received money to Samsung's resources
         self.resources['money'] += amount
 
 
-class SamsungSub(CompanyAgent):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+class SamsungSub(SamsungAgent):
+    def __init__(self, unique_id, model, country_agent, company_name):
+        super().__init__(unique_id, model, country_agent, company_name)
         self.type = 'SamsungSub'
         self.talent = random.randint(*self.company_data["SamsungSub"]["talent_range"])
         self.resources = self.company_data["SamsungSub"]["initial_resources"].copy()
@@ -996,69 +1203,73 @@ class SamsungSub(CompanyAgent):
 
     def step(self):
         asml_agent = None
-        sumco_agent = None
+        sksiltron_agent = None
         for agent in self.model.schedule.agents:
             if isinstance(agent, ASMLAgent) and asml_agent is None:
                 asml_agent = agent
-            elif isinstance(agent, SumcoAgent) and sumco_agent is None:
-                sumco_agent = agent
+            elif isinstance(agent, SKSiltronAgent) and sksiltron_agent is None:
+                sksiltron_agent = agent
 
-            if asml_agent is not None and sumco_agent is not None:
+            if asml_agent is not None and sksiltron_agent is not None:
                 break
+        # Buy tools from the ASMLAgent
+        self.buy_resources_from(asml_agent, 'services', 10)
+        #print(f"TSMC has bought services.")
 
-        # similar to TSMCAgent
+        # Buy wafers from the SUMCOAgent
+        self.buy_resources_from(sksiltron_agent, 'wafers', 10)
 
         # At each step, the foundry receives a random order from a 'customer'
         self.manufacture_chips()
 
 class MediaTekAgent(CompanyAgent):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, unique_id, model, country_agent, company_name):
+        super().__init__(unique_id, model, country_agent, company_name)
         self.type = 'MediaTek'
         self.talent = random.randint(*self.company_data["MediaTek"]["talent_range"])
         self.resources = self.company_data["MediaTek"]["initial_resources"].copy()
 
 
 class SMICAgent(CompanyAgent):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, unique_id, model, country_agent, company_name):
+        super().__init__(unique_id, model, country_agent, company_name)
         self.type = 'SMIC'
         self.talent = random.randint(*self.company_data["SMIC"]["talent_range"])
         self.resources = self.company_data["SMIC"]["initial_resources"].copy()
 
 class HuaHongAgent(CompanyAgent):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, unique_id, model, country_agent, company_name):
+        super().__init__(unique_id, model, country_agent, company_name)
         self.type = 'HuaHong'
         self.talent = random.randint(*self.company_data["HuaHong"]["talent_range"])
         self.resources = self.company_data["HuaHong"]["initial_resources"].copy()
 
 class InfineonAgent(CompanyAgent):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, unique_id, model, country_agent, company_name):
+        super().__init__(unique_id, model, country_agent, company_name)
         self.type = 'Infineon'
         self.talent = random.randint(*self.company_data["Infineon"]["talent_range"])
         self.resources = self.company_data["Infineon"]["initial_resources"].copy()
 
 class STMicroelectronicsAgent(CompanyAgent):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, unique_id, model, country_agent, company_name):
+        super().__init__(unique_id, model, country_agent, company_name)
         self.type = 'STMicroelectronics'
         self.talent = random.randint(*self.company_data["STMicroelectronics"]["talent_range"])
         self.resources = self.company_data["STMicroelectronics"]["initial_resources"].copy()
 
 
 class RenesasAgent(CompanyAgent):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, unique_id, model, country_agent, company_name):
+        super().__init__(unique_id, model, country_agent, company_name)
         self.type = 'Renesas'
         self.talent = random.randint(*self.company_data["Renesas"]["talent_range"])
         self.resources = self.company_data["Renesas"]["initial_resources"].copy()
 
 
 class SonyAgent(CompanyAgent):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, unique_id, model, country_agent, company_name):
+        super().__init__(unique_id, model, country_agent, company_name)
         self.type = 'Sony'
         self.talent = random.randint(*self.company_data["Sony"]["talent_range"])
         self.resources = self.company_data["Sony"]["initial_resources"].copy()

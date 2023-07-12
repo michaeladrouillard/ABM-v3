@@ -1,6 +1,7 @@
 CompanyAgent: 
+  lookback_steps: 5
   talent_range: [1, 10]
-  influence: 1
+  influence: 0.5
   initial_resources: 
     money: 100
     chips: 50
@@ -22,7 +23,7 @@ CompanyAgent:
     # more Nvidia-specific configurations here...
   CustomerAgent:
     talent_range: [5, 10]
-    initial_resources: {'money': 100, 'chips': 100, 'services': 2, 'wafers': 100}
+    initial_resources: {'money': 1000, 'chips': 100, 'services': 2, 'wafers': 100}
     order_range: [50,100]
     # more Nvidia-specific configurations here...
   FabIntel:
@@ -74,6 +75,22 @@ CompanyAgent:
     talent_range: [7, 12]
     initial_resources: {'money': 150, 'chips': 0, 'wafers': 150}
     # more Sumco-specific configurations here...
+  SKSiltron:
+    talent_range: [7, 12]
+    initial_resources: {'money': 150, 'chips': 0, 'wafers': 150, 'silicon': 3}
+    # more SKSiltron-specific configurations here...
+  Siltronic:
+    talent_range: [7, 12]
+    initial_resources: {'money': 150, 'chips': 0, 'wafers': 150, 'services': 0}
+    # more Siltronic-specific configurations here...
+  Fujimi:
+    talent_range: [7, 12]
+    initial_resources: {'money': 150, 'chips': 0, 'services': 100, 'silicon': 0}
+    # more Fujimi-specific configurations here...
+  ShinEtsu:
+    talent_range: [7, 12]
+    initial_resources: {'money': 150, 'chips': 0, 'services': 0, 'silicon': 500}
+    # more Fujimi-specific configurations here...
 CountryAgent: 
   initial_resources: 
     money: 100

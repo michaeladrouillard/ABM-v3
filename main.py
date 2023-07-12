@@ -37,9 +37,9 @@ def run_model(agent_dict):
     agent_data.to_csv('agent_data.csv')
 
  # Plot model data
-    model_data.plot()
-    plt.show()
-    model.visualize_network()
+    #model_data.plot()
+    #plt.show()
+    #model.visualize_network()
 def main():
 
     global agent_dict
@@ -51,3 +51,44 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
+import matplotlib.pyplot as plt
+
+def plot_sensitivity_analysis(modelclass, agent_dict, lookback_steps_values, run_steps):
+    # model_class: your model class
+    # agent_dict: agent configuration dictionary
+    # lookback_steps_values: a list of lookback_steps values to test
+    # run_steps: number of steps to run each model
+    
+    selected_companies = ["TSMC"]
+    
+    for value in lookback_steps_values:
+        # Update the 'lookback_steps' value in the agent_dict
+        agent_dict["lookback_steps"] = value
+
+        model_instance = modelclass(agent_dict)  # Initialize your model with the new agent_dict
+
+        for _ in range(run_steps):  # Run the model
+            model_instance.step()
+
+            # After each model step, update the 'money_history' of each company agent
+            for company in model_instance.schedule.agents:
+                if isinstance(company, CompanyAgent) and company.company_name in selected_companies:
+                    company.money_history.append(company.resources["money"])
+
+        # Plot the results
+        for company in model_instance.schedule.agents:
+            if isinstance(company, CompanyAgent) and company.company_name in selected_companies:
+                plt.plot(company.money_history, label=f'{company.company_name}, lookback={value}')
+    
+    plt.xlabel('Time Steps')
+    plt.ylabel('Money')
+    plt.legend()
+    plt.show()
+
+lookback_steps_values = [5, 10, 15, 20]  # Or whatever values you're interested in
+run_steps = 100  # Or however many steps you want to run the model for
+plot_sensitivity_analysis(GameModel, agent_dict, lookback_steps_values, run_steps)

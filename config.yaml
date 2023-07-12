@@ -1,3 +1,4 @@
+lookback_steps: 5 #uh oh we have two of these in the two different yamls. we should probably just have on yaml
 resource_transfer: 
   China: 
     Japan: 
@@ -36,12 +37,13 @@ CompanyAgent:
 
 
 company_country_map:
-  US: [Nvidia, Intel, FabIntel]
+  US: [Nvidia, Intel, FabIntel, SKSiltron]
   Taiwan: [TSMC, MediaTek]
   China: [SMIC, HuaHong]
   EU: [Infineon, STMicroelectronics, ASML]
-  Japan: [Renesas, Sony, Sumco]
+  Japan: [Renesas, Sony, Sumco, Fujimi, ShinEtsu]
   SKorea: [Samsung, SamsungSub]
+  Germany: [Siltronic]
 
 
 partnerships:

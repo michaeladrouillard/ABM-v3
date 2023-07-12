@@ -1,4 +1,4 @@
-from Agents.companycountry import CountryAgent, CompanyAgent, NvidiaAgent, SMICAgent, InfineonAgent, RenesasAgent, TSMCAgent, IntelAgent, HuaHongAgent, STMicroelectronicsAgent, SonyAgent, MediaTekAgent, ASMLAgent, SumcoAgent, FabIntel, SamsungAgent, CustomerAgent, SamsungSub
+from Agents.companycountry import CountryAgent, CompanyAgent, NvidiaAgent, SMICAgent, InfineonAgent, RenesasAgent, TSMCAgent, IntelAgent, HuaHongAgent, STMicroelectronicsAgent, SonyAgent, MediaTekAgent, ASMLAgent, SumcoAgent, FabIntel, SamsungAgent, CustomerAgent, SamsungSub, SiltronicAgent, FujimiAgent, SKSiltronAgent, ShinEtsuAgent
 from Agents.communication import CommunicationChannel
 from Agents.resource import Resource
 from Agents.mine import MineAgent
@@ -24,9 +24,7 @@ class GameModel(Model):
                                         "Twitter": CommunicationChannel("Twitter", 0.5, self)}
         #Creating a schedule using Mesa's RandomActivation
         self.schedule = RandomActivation(self)
-        #Initializing the flags and counters of the main risk we're investigating
-        self.china_invades_taiwan = False #indicator of war
-        self.invasion_probability = 0 #probability of invasion
+        self.country_agents = {}  
         self.company_class_mapping = {
     "ASML": ASMLAgent,
     "Nvidia": NvidiaAgent,
@@ -42,7 +40,11 @@ class GameModel(Model):
     "MediaTek": MediaTekAgent,
     "Sumco": SumcoAgent,
     "Samsung": SamsungAgent,
-    "SamsungSub": SamsungSub,}
+    "SamsungSub": SamsungSub,
+    "Siltronic": SiltronicAgent,
+    "Fujimi": FujimiAgent,
+    "SKSiltron": SKSiltronAgent,
+    "ShinEtsu": ShinEtsuAgent}
 
 
         agent_id = 0
@@ -55,13 +57,16 @@ class GameModel(Model):
             # Create a CountryAgent for each country
             country_agent = CountryAgent(agent_id, self, country, **country_config)
             agent_id += 1  # Increment the agent ID
-            
             self.schedule.add(country_agent)
+            #store the country agent in the dictionary
+            self.country_agents[country] = country_agent
+
             for company in companies:
                 CompanyAgentClass = self.company_class_mapping.get(company, CompanyAgent)
-                company_agent = CompanyAgentClass(agent_id, self, country_agent, company)
+                # Look up the country agent in the dictionary when creating the company agent
+                company_agent = CompanyAgentClass(agent_id, self, self.country_agents[country], company)
                 agent_id += 1  
-                country_agent.set_company(company_agent)
+                #country_agent.set_company(company_agent)
                 self.schedule.add(company_agent)
 
             for _ in range(num_mines):
@@ -75,7 +80,7 @@ class GameModel(Model):
 
         additional_companies = agent_dict["additional_companies"]  # Load the number of additional companies from the yaml file
         for _ in range(additional_companies):
-            country_agent = random.choice(self.schedule.agents)  # Choose a random country agent
+            country_agent = random.choice([agent for agent in self.schedule.agents if isinstance(agent, CountryAgent)])  # Choose a random country agent
             company_name = f"Company_{agent_id}"  # Generate a unique company name based on the agent ID
             company_agent = CompanyAgent(agent_id, self, country_agent, company_name)
             agent_id += 1  # Increment the agent ID
@@ -101,8 +106,6 @@ class GameModel(Model):
         self.datacollector = DataCollector(
             model_reporters={"Total Money": lambda m: sum(a.resources["money"] for a in m.schedule.agents),
                             "Total Chips": lambda m: sum(a.resources["chips"] for a in m.schedule.agents),
-                            "China Invades Taiwan": lambda m: m.china_invades_taiwan,
-                            "Invasion Probability": lambda m: m.invasion_probability,
                             "Total Capabilities Growth Rate": lambda m: sum(a.capabilities_score for a in m.schedule.agents if isinstance(a, CompanyAgent)),
                             "GDP": lambda m: {agent.country: agent.calculate_gdp() for agent in m.schedule.agents if isinstance(agent, CountryAgent)}},
             agent_reporters={"Agent Report": lambda a: a.report()} )
@@ -164,52 +167,3 @@ class GameModel(Model):
       self.datacollector.collect(self) #collect data
       self.schedule.step()
 
-
-# from mesa.visualization.modules import CanvasGrid, ChartModule
-# from mesa.visualization.ModularVisualization import ModularServer
-
-# def agent_portrayal(agent):
-#     if isinstance(agent, CountryAgent):
-#         portrayal = {"Shape": "circle",
-#                      "Filled": "true",
-#                      "Color": "blue",
-#                      "Layer": 0,
-#                      "r": 0.5}
-#     elif isinstance(agent, CompanyAgent):
-#         portrayal = {"Shape": "rect",
-#                      "Filled": "true",
-#                      "Color": "green",
-#                      "Layer": 1,
-#                      "w": 0.5,
-#                      "h": 0.5}
-#     elif isinstance(agent, MineAgent):
-#         portrayal = {"Shape": "circle",
-#                      "Filled": "true",
-#                      "Color": "brown",
-#                      "Layer": 1,
-#                      "r": 0.3}
-#     elif isinstance(agent, ProcessingPlantAgent):
-#         portrayal = {"Shape": "rect",
-#                      "Filled": "true",
-#                      "Color": "yellow",
-#                      "Layer": 1,
-#                      "w": 0.3,
-#                      "h": 0.3}
-#     return portrayal
-
-
-# grid = CanvasGrid(agent_portrayal, 10, 10, 500, 500)
-
-
-# chart = ChartModule([{"Label": "Total Money", "Color": "Black"},
-#                      {"Label": "Total Chips", "Color": "Blue"}])
-
-# with open("config.yaml", 'r') as stream:
-#     agent_dict = yaml.safe_load(stream)
-
-# server = ModularServer(GameModel,
-#                        [grid, chart],
-#                        "Game Model",
-#                        {"agent_dict": agent_dict})  # Assuming agent_dict has been defined earlier.
-
-# server.launch()
