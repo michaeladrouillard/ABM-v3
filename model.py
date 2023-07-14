@@ -1,4 +1,4 @@
-from Agents.companycountry import CountryAgent, CompanyAgent, NvidiaAgent, SMICAgent, InfineonAgent, RenesasAgent, TSMCAgent, IntelAgent, HuaHongAgent, STMicroelectronicsAgent, SonyAgent, MediaTekAgent, ASMLAgent, SumcoAgent, FabIntel, SamsungAgent, CustomerAgent, SamsungSub, SiltronicAgent, FujimiAgent, SKSiltronAgent, ShinEtsuAgent
+from Agents.companycountry import CountryAgent, CompanyAgent, NvidiaAgent, SMICAgent, InfineonAgent, RenesasAgent, TSMCAgent, IntelAgent, HuaHongAgent, STMicroelectronicsAgent, SonyAgent, MediaTekAgent, ASMLAgent, SumcoAgent, SamsungAgent, CustomerAgent, SamsungSub, SiltronicAgent, FujimiAgent, SKSiltronAgent, ShinEtsuAgent, GlobalFoundriesAgent, AMDAgent
 from Agents.communication import CommunicationChannel
 from Agents.resource import Resource
 from Agents.mine import MineAgent
@@ -29,7 +29,6 @@ class GameModel(Model):
     "ASML": ASMLAgent,
     "Nvidia": NvidiaAgent,
     "Intel": IntelAgent,
-    "FabIntel": FabIntel,
     "SMIC": SMICAgent,
     "HuaHong": HuaHongAgent,
     "Infineon": InfineonAgent,
@@ -44,7 +43,9 @@ class GameModel(Model):
     "Siltronic": SiltronicAgent,
     "Fujimi": FujimiAgent,
     "SKSiltron": SKSiltronAgent,
-    "ShinEtsu": ShinEtsuAgent}
+    "ShinEtsu": ShinEtsuAgent,
+    "GlobalFoundries": GlobalFoundriesAgent,
+    "AMD": AMDAgent}
 
 
         agent_id = 0

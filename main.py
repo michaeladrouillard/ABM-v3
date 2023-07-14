@@ -54,16 +54,13 @@ if __name__ == "__main__":
 
 
 
-
-import matplotlib.pyplot as plt
-
 def plot_sensitivity_analysis(modelclass, agent_dict, lookback_steps_values, run_steps):
     # model_class: your model class
     # agent_dict: agent configuration dictionary
     # lookback_steps_values: a list of lookback_steps values to test
     # run_steps: number of steps to run each model
     
-    selected_companies = ["TSMC"]
+    selected_companies = ["Intel", "TSMC", "Samsung", "GlobalFoundries"]
     
     for value in lookback_steps_values:
         # Update the 'lookback_steps' value in the agent_dict

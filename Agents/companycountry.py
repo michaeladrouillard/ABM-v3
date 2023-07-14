@@ -32,7 +32,8 @@ class CompanyAgent(Agent):
         self.capabilities_score = 0
         self.public_opinion = 0
         self.partners = []
-        
+        # self.order_book = []
+
         self.influence = self.company_data["influence"]
         self.project_launch_threshold = self.company_data["project_launch_threshold"]
         self.government_lobby_money_threshold = self.company_data["government_lobby_money_threshold"]
@@ -41,7 +42,12 @@ class CompanyAgent(Agent):
         self.government_lobby_talent_threshold = self.company_data["government_lobby_talent_threshold"]
         self.competition_percentage = self.company_data["competition_percentage"]
         self.history = {"launch_project": [], "lobby_government": [], "cooperate_with_country": [], "cooperate_with_company": [], "compete_with_company": []}
-        print(f'Initialized company {self.company_name}, country_agent type: {type(self.country_agent)}')
+
+        #print(f'Initialized company {self.company_name}, country_agent type: {type(self.country_agent)}')
+
+    # def receive_order(self, ordering_agent, quantity):
+    #     self.order_book.append((ordering_agent, quantity))  # Append the new order to the order book
+    #     #print(f"FabIntel has received an order of {quantity} chips from {ordering_agent.type}.")
 
     
     def update_trend_and_horizon(self):
@@ -573,20 +579,15 @@ class CountryAgent(Agent):
             print(f'Processing request for {company}: {request_info}')
             money_gain, chips_gain = request_info["potential_gain"]
 
-
-            # Evaluating feasibility: in this case, checking if the country has enough resources
-            is_feasible = self.resources["money"] >= money_gain and self.resources["chips"] >= chips_gain
-
-            if not is_feasible:
-                continue  # Skip this request if it's not feasible
-
             # Decision-making: probabilistic
             approval_probability = np.random.uniform(0, 1)  # Random float between 0 and 1
-            if approval_probability < 0.7:  # 50% chance of approval
+            if approval_probability < 0.6:  #chance of approval
+                print(f'Before transaction - Country money: {self.resources["money"]}, chips: {self.resources["chips"]}, Company money: {company.resources["money"]}, chips: {company.resources["chips"]}')
                 self.resources["money"] -= money_gain  # Decrease the country's resources
                 self.resources["chips"] -= chips_gain
                 company.resources["money"] += money_gain  # Increase the company's resources
                 company.resources["chips"] += chips_gain
+                print(f'After transaction - Country money: {self.resources["money"]}, chips: {self.resources["chips"]}, Company money: {company.resources["money"]}, chips: {company.resources["chips"]}')
                 print(f'Processed request for {company}: {request_info}, approval probability: {approval_probability}')
             else:
                 print(f'Request not approved for {company}: {request_info}, approval probability: {approval_probability}')
@@ -725,6 +726,12 @@ class IntelAgent(CompanyAgent):
         self.resources = self.company_data["Intel"]["initial_resources"].copy()
         self.capabilities_score = 0
         self.chips_in_stock = 0
+        self.order_book = deque()
+
+    def receive_payment(self, amount):
+        # Add the received money to Samsung's resources
+        self.resources['money'] += amount
+
     def r_and_d(self):
         # Calculate the increase in capabilities score based on money and talent
         increase = self.resources["money"] * self.talent / 10
@@ -733,39 +740,10 @@ class IntelAgent(CompanyAgent):
         # Print the outcome
         #print(f"Intel's capabilities score increased by {increase}.")
         #print(f"New capabilities score: {self.capabilities_score}")
-
-    def order_chips_from_fabintel(self):
-        # Find the TSMC agent in the model's schedule
-        fab_agent = None
-        for agent in self.model.schedule.agents:
-            if isinstance(agent, FabIntel):
-                fab_agent = agent
-                break
-
-        if fab_agent is None:
-            raise Exception("fab_agent not found in the model's schedule.")
-
-        # Calculate quantity of chips to order
-        # We'll use 10% of the available money, and 5 chips per point of capabilities
-        #Nvidia will always order at least one chip
-        quantity = max(1, int(self.resources["money"] * 0.1) + self.capabilities_score * 2)
-
-        # Calculate the cost of the chips (assuming 1 chip costs 10 money)
-        cost = quantity * 10
-
-        # Check if Intel has enough money
-        if self.resources["money"] >= cost:
-            # Subtract money from Intel
-            self.resources["money"] -= cost
-        # Place the order with TSMC
-            fab_agent.receive_order(self, quantity)
-            #print(f"Intel has ordered {quantity} chips from FabIntel.")
-
-    def receive_chips(self, quantity):
-        # Add the received chips to Intel's resources
-        self.chips_in_stock += quantity
-        # Print the new chips count
-        #print(f"Intel now has {self.resources['chips']} chips.")
+   
+    def receive_order(self, ordering_agent, quantity):
+        self.order_book.append((ordering_agent, quantity))  # Append the new order to the order book
+        #print(f"FabIntel has received an order of {quantity} chips from {ordering_agent.type}.")
 
     def sell_chips(self, quantity):
         if self.chips_in_stock >= quantity:
@@ -781,26 +759,6 @@ class IntelAgent(CompanyAgent):
             #print(f"Intel sold {quantity} chips for {price} money.")
         else:
             print("Insufficient chips in stock to fulfill the order.")
-    def step(self):
-        print(f'Step function called for Intel')
-        self.order_chips_from_fabintel()
-        # Sell chips to anonymous company
-        quantity_to_sell = random.randint(1, 10)
-        self.sell_chips(quantity_to_sell)
-        self.r_and_d()
-
-
-class FabIntel(IntelAgent):
-    def __init__(self, unique_id, model, country_agent, company_name):
-        super().__init__(unique_id, model, country_agent, company_name)
-        self.type = 'FabIntel'
-        self.order_book = deque()
-        # Additional attributes or modifications specific to DesignIntel
-        # ...
-    
-    def receive_order(self, ordering_agent, quantity):
-        self.order_book.append((ordering_agent, quantity))  # Append the new order to the order book
-        #print(f"FabIntel has received an order of {quantity} chips from {ordering_agent.type}.")
 
     def manufacture_chips(self):
         if len(self.order_book) == 0:  # If the order book is empty, there's nothing to manufacture
@@ -810,7 +768,7 @@ class FabIntel(IntelAgent):
         ordering_agent, quantity = self.order_book[0]  # Get the oldest order from the order book
 
         # Check how many chips intel can manufacture with its current resources
-        max_quantity = min(self.resources['wafers']//2, self.resources['services'], quantity)
+        max_quantity = min(self.resources['wafers']//2, self.resources['services'], quantity) * self.capabilities_score
         
         # If intel can't manufacture any chips, return None
         if max_quantity <= 0:
@@ -855,15 +813,13 @@ class FabIntel(IntelAgent):
             if asml_agent is not None and siltronic_agent is not None:
                 break
 
-        # Buy tools from the ASMLAgent
         self.buy_resources_from(asml_agent, 'services', 10)
-        #print(f"TSMC has bought services.")
-
-        # Buy wafers from the SUMCOAgent
         self.buy_resources_from(siltronic_agent, 'wafers', 10)
-
-        # Manufacture chips and interact with ordering agents
         self.manufacture_chips()
+        quantity_to_sell = random.randint(1, 10)
+        self.sell_chips(quantity_to_sell)
+        self.r_and_d()
+
 
 class TSMCAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -890,7 +846,7 @@ class TSMCAgent(CompanyAgent):
         ordering_agent, quantity = self.order_book[0]  # Get the oldest order from the order book
 
         # Check how many chips TSMC can manufacture with its current resources
-        max_quantity = min(self.resources['wafers']//2, self.resources['services'], quantity)
+        max_quantity = min(self.resources['wafers']//2, self.resources['services'], quantity) * self.capabilities_score
         
         # If TSMC can't manufacture any chips, return None
         if max_quantity <= 0:
@@ -948,6 +904,164 @@ class TSMCAgent(CompanyAgent):
         # Manufacture chips and interact with ordering agents
         self.manufacture_chips()
 
+
+class AMDAgent(CompanyAgent):
+    def __init__(self, unique_id, model, country_agent, company_name):
+        super().__init__(unique_id, model, country_agent, company_name)
+        self.type = 'AMD'
+        self.talent = random.randint(*self.company_data["AMD"]["talent_range"])
+        self.resources = self.company_data["AMD"]["initial_resources"].copy()
+        self.chips_in_stock = 0
+        self.capabilities_score = 0
+        #print(f"AMD {self.unique_id} instantiated.")
+
+    def r_and_d(self):
+        # Calculate the increase in capabilities score based on money and talent
+        increase = self.resources["money"] * self.talent / 10
+        self.capabilities_score += increase
+
+        # Print the outcome
+        #print(f"AMD's capabilities score increased by {increase}.")
+        #print(f"New capabilities score: {self.capabilities_score}")
+
+
+    def order_chips_from_GlobalFoundries(self):
+        # Find the GF agent in the model's schedule
+        GF_agent = None
+        for agent in self.model.schedule.agents:
+            if isinstance(agent, GlobalFoundriesAgent):
+                GF_agent = agent
+                break
+
+        if GF_agent is None:
+            raise Exception("GF agent not found in the model's schedule.")
+
+        # Calculate quantity of chips to order
+        # We'll use 10% of the available money, and 5 chips per point of capabilities
+        #Nvidia will always order at least one chip
+        quantity = max(1, int(self.resources["money"] * 0.1) + self.capabilities_score * 2)
+
+        # Calculate the cost of the chips (assuming 1 chip costs 10 money)
+        cost = quantity * 10
+
+        
+        if self.resources["money"] >= cost:
+            self.resources["money"] -= cost
+            GF_agent.receive_payment(cost)
+            GF_agent.receive_order(self, quantity)
+    
+    def receive_chips(self, quantity):
+        self.chips_in_stock += quantity
+        #print(f"AMD now has {self.resources['chips']} chips.")
+
+    def sell_chips(self, quantity):
+        if self.chips_in_stock >= quantity:
+            # Calculate the price of the chips (assuming 1 chip costs 20 money)
+            price = quantity * 20
+
+            # Subtract the chips from AMD's stock
+            self.chips_in_stock -= quantity
+
+            # Add money to Nvidia's resources
+            self.resources["money"] += price
+
+            #print(f"AMD sold {quantity} chips for {price} money.")
+        else:
+            print("Insufficient chips in stock to fulfill the order.")
+
+    def step(self):
+        print(f'Step function called for AMD')
+        self.order_chips_from_GlobalFoundries()
+        # Sell chips to anonymous company
+        quantity_to_sell = random.randint(1, 10)
+        self.sell_chips(quantity_to_sell)
+        self.r_and_d()
+
+class GlobalFoundriesAgent(CompanyAgent):
+    def __init__(self, unique_id, model, country_agent, company_name):
+        super().__init__(unique_id, model, country_agent, company_name)
+        self.type = 'GlobalFoundries'
+        self.talent = random.randint(*self.company_data["GlobalFoundries"]["talent_range"])
+        self.resources = self.company_data["GlobalFoundries"]["initial_resources"].copy()
+        self.order_book = deque()  # Initialize the order book as an empty deque
+
+    def receive_order(self, ordering_agent, quantity):
+        self.order_book.append((ordering_agent, quantity))  # Append the new order to the order book
+        #print(f"GlobalFoundries has received an order of {quantity} chips from {ordering_agent.type}.")
+
+    def receive_payment(self, amount):
+        # Add the received money to TSMC's resources
+        self.resources['money'] += amount
+        #print(f"GlobalFoundries has received a payment of {amount} money.")
+
+    def manufacture_chips(self):
+        if len(self.order_book) == 0:  # If the order book is empty, there's nothing to manufacture
+            #print(f"Order book is empty.")
+            return None
+        
+        ordering_agent, quantity = self.order_book[0]  # Get the oldest order from the order book
+
+        # Check how many chips GlobalFoundries can manufacture with its current resources
+        max_quantity = min(self.resources['wafers']//2, self.resources['services'], quantity) * self.capabilities_score
+        
+        # If TSMC can't manufacture any chips, return None
+        if max_quantity <= 0:
+            #print(f"GlobalFoundries does not have enough resources to manufacture the {quantity} chips ordered by {ordering_agent.type}.")
+            return None
+
+        # Subtract the used resources and add the manufactured chips
+        self.resources['wafers'] -= max_quantity*2
+        self.resources['services'] -= max_quantity
+        self.resources['chips'] += max_quantity
+
+        # Update the order in the order book or remove it if it's been completely fulfilled
+        if max_quantity < quantity:
+            self.order_book[0] = (ordering_agent, quantity - max_quantity)
+        else:
+            self.order_book.popleft()
+
+
+        # Send the manufactured chips to the ordering agent
+        self.send_chips_to(ordering_agent, max_quantity)
+        #print(f"GlobalFoundries has manufactured {max_quantity} chips for {ordering_agent.type}.")
+        # Return the details of the order that's just been processed
+        return ordering_agent, max_quantity
+
+
+    def send_chips_to(self, receiving_agent, quantity):
+        # Subtract the chips from GlobalFoundries and add them to the receiving agent
+        self.resources['chips'] -= quantity
+        receiving_agent.receive_chips(quantity) 
+        #print(f"GlobalFoundries has sent {quantity} chips to {receiving_agent.type}.")
+
+ 
+     
+    def step(self):
+        # Find the ASMLAgent and SUMCOAgent in the model's schedule
+        asml_agent = None
+        sumco_agent = None
+        for agent in self.model.schedule.agents:
+            if isinstance(agent, ASMLAgent) and asml_agent is None:
+                asml_agent = agent
+            elif isinstance(agent, SumcoAgent) and sumco_agent is None:
+                sumco_agent = agent
+
+            # If we found both agents, we can break the loop
+            if asml_agent is not None and sumco_agent is not None:
+                break
+
+        # Buy tools from the ASMLAgent
+        self.buy_resources_from(asml_agent, 'services', 10)
+        #print(f"TSMC has bought services.")
+
+        # Buy wafers from the SUMCOAgent
+        self.buy_resources_from(sumco_agent, 'wafers', 10)
+
+        # Manufacture chips and interact with ordering agents
+        self.manufacture_chips()
+
+
+
 class ASMLAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent, company_name):
         super().__init__(unique_id, model, country_agent, company_name)
@@ -990,7 +1104,7 @@ class FujimiAgent(CompanyAgent):
 
     def step(self):
         self.manufacture_services()
-        print(f"Fujimi's services supply: {self.resources['services']}")
+        #print(f"Fujimi's services supply: {self.resources['services']}")
 
 class SiltronicAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -1039,7 +1153,8 @@ class SumcoAgent(CompanyAgent):
 
     def step(self):
         # Print the current wafer supply
-        print(f"Sumco's wafer supply: {self.resources['wafers']}")
+        self.manufacture_wafers()
+        #print(f"Sumco's wafer supply: {self.resources['wafers']}")
 
 
 class SKSiltronAgent(CompanyAgent):
@@ -1088,7 +1203,7 @@ class ShinEtsuAgent(CompanyAgent):
 
     def step(self):
         # Print the current wafer supply
-        print(f"ShinEtsu's silicon supply: {self.resources['silicon']}")
+        #print(f"ShinEtsu's silicon supply: {self.resources['silicon']}")
         self.process_silicon()
 
 
@@ -1101,23 +1216,23 @@ class CustomerAgent(CompanyAgent):
         self.talent = random.randint(*self.company_data["CustomerAgent"]["talent_range"])
         self.resources = self.company_data["CustomerAgent"]["initial_resources"].copy()
         self.initial_money = self.resources['money']  
-        print(f"Customer agent {self.unique_id} created.")
+        #print(f"Customer agent {self.unique_id} created.")
 
     def place_order(self, quantity, manufacturing_agents):
         chosen_agent = random.choice(manufacturing_agents)
         # Assuming each manufacturing agent has a receive_order method
         chosen_agent.receive_order(self, quantity)
-        print(f"{self.type} has placed an order of {quantity} chips to {chosen_agent.type}.")
+        #print(f"{self.type} has placed an order of {quantity} chips to {chosen_agent.type}.")
 
     def receive_chips(self, quantity):
         self.resources['chips'] += quantity
-        print(f"{self.type} has received {quantity} chips.")
+        #print(f"{self.type} has received {quantity} chips.")
 
     def pay_for_order(self, manufacturing_agent, amount):
         if self.resources['money'] >= amount:
             self.resources['money'] -= amount
             manufacturing_agent.receive_payment(amount)
-            print(f"{self.type} has paid {amount} money to {manufacturing_agent.type}.")
+            #print(f"{self.type} has paid {amount} money to {manufacturing_agent.type}.")
         else:
             print(f"{self.type} does not have enough money to pay {amount} to {manufacturing_agent.type}.")
 
@@ -1126,17 +1241,23 @@ class CustomerAgent(CompanyAgent):
         # Collect all manufacturing agents in the model's schedule
         manufacturing_agents = []
         for agent in self.model.schedule.agents:
-            if isinstance(agent, (SamsungSub, TSMCAgent)):  # Add other manufacturing agents here
+            if isinstance(agent, (SamsungSub, TSMCAgent, IntelAgent)):  # Add other manufacturing agents here
                 manufacturing_agents.append(agent)
-
-        # Place a random order to any manufacturing agent
-        order_quantity = random.randint(*self.company_data["CustomerAgent"]["order_range"])
-        self.place_order(order_quantity, manufacturing_agents)
         
-        # Calculate payment based on some logic, here assuming 1 chip = 1 money
-        payment_amount = order_quantity  # Change this as per your model
-        # Pay any random manufacturing agent 
-        self.pay_for_order(random.choice(manufacturing_agents), payment_amount)
+        # Determine number of orders to place this step
+        num_orders = random.randint(5, 20)
+
+        # Randomly select a subset of manufacturing agents to place orders with
+        selected_agents = random.sample(manufacturing_agents, min(num_orders, len(manufacturing_agents)))
+
+        # Loop over selected agents and place an order with each
+        for chosen_agent in selected_agents:
+            # Place order and make payment to the chosen agent
+            order_quantity = random.randint(*self.company_data["CustomerAgent"]["order_range"])
+            self.place_order(order_quantity, [chosen_agent])  # Pass chosen agent as a list to the place_order function
+            payment_amount = order_quantity  # Assuming 1 chip = 1 money
+            self.pay_for_order(chosen_agent, payment_amount)  # Pay the chosen agent
+
 
 class SamsungAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -1157,11 +1278,11 @@ class SamsungSub(SamsungAgent):
 
     def receive_order(self, ordering_agent, quantity):
         self.order_book.append((ordering_agent, quantity))
-        print(f"{self.type} has received an order of {quantity} chips from {ordering_agent.type}.")
+        #print(f"{self.type} has received an order of {quantity} chips from {ordering_agent.type}.")
 
     def receive_payment(self, amount):
         self.resources['money'] += amount
-        print(f"{self.type} has received a payment of {amount} money.")
+        #print(f"{self.type} has received a payment of {amount} money.")
 
     def manufacture_chips(self):
         if len(self.order_book) == 0:  # If the order book is empty, there's nothing to manufacture
@@ -1171,11 +1292,11 @@ class SamsungSub(SamsungAgent):
         ordering_agent, quantity = self.order_book[0]  # Get the oldest order from the order book
 
         # Check how many chips it can manufacture with its current resources
-        max_quantity = min(self.resources['wafers']//2, self.resources['services'], quantity)
+        max_quantity = min(self.resources['wafers']//2, self.resources['services'], quantity) * self.capabilities_score
         
         # If it can't manufacture any chips, return None
         if max_quantity <= 0:
-            print(f"TSMC does not have enough resources to manufacture the {quantity} chips ordered by {ordering_agent.type}.")
+            #print(f"TSMC does not have enough resources to manufacture the {quantity} chips ordered by {ordering_agent.type}.")
             return None
 
         # Subtract the used resources and add the manufactured chips
@@ -1192,14 +1313,14 @@ class SamsungSub(SamsungAgent):
 
         # Send the manufactured chips to the ordering agent
         self.send_chips_to(ordering_agent, max_quantity)
-        print(f"Samsung Subsidiary has manufactured {max_quantity} chips for {ordering_agent.type}.")
+        #print(f"Samsung Subsidiary has manufactured {max_quantity} chips for {ordering_agent.type}.")
         # Return the details of the order that's just been processed
         return ordering_agent, max_quantity
 
     def send_chips_to(self, receiving_agent, quantity):
         self.resources['chips'] -= quantity
         receiving_agent.receive_chips(quantity) 
-        print(f"Samsung Subsidiary has sent {quantity} chips to {receiving_agent.type}.")
+        #print(f"Samsung Subsidiary has sent {quantity} chips to {receiving_agent.type}.")
 
     def step(self):
         asml_agent = None
