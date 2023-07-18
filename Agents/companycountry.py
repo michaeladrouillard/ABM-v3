@@ -32,7 +32,9 @@ class CompanyAgent(Agent):
         self.capabilities_score = 0
         self.public_opinion = 0
         self.partners = []
-        # self.order_book = []
+        self.chip_price_history = [] 
+        self.chips_in_stock = 0
+        self.order_book = []
 
         self.influence = self.company_data["influence"]
         self.project_launch_threshold = self.company_data["project_launch_threshold"]
@@ -50,6 +52,28 @@ class CompanyAgent(Agent):
     #     #print(f"FabIntel has received an order of {quantity} chips from {ordering_agent.type}.")
 
     
+    def set_price(self, quantity):
+            # Calculate the price of the chips based on the demand and supply
+            # Use the historical price if available
+            if self.chip_price_history:
+                avg_past_price = sum(self.chip_price_history) / len(self.chip_price_history)
+            else:
+                avg_past_price = 20  # Initial price if no historical price available
+
+            # Price adjustment based on demand and supply
+            price_adj = len(self.order_book) - self.chips_in_stock / 1000
+
+            # Competition factor, assuming more competition leads to lower prices
+            competition_factor = 1 - 0.01 * len(self.model.schedule.agents)
+
+        # Calculate the price per chip
+            price_per_chip = avg_past_price + price_adj * competition_factor
+
+        # Calculate the total price
+            price = quantity * price_per_chip
+
+            return price
+        
     def update_trend_and_horizon(self):
         # Update the money history
         if len(self.money_history) >= self.lookback_steps:
@@ -379,7 +403,9 @@ class CompanyAgent(Agent):
         self.choose_action()
         self.prev_resources = self.resources.copy()
         self.update_trend_and_horizon()
-
+   # Keep the chip price history within the lookback steps
+        if len(self.chip_price_history) > self.lookback_steps:
+            self.chip_price_history.pop(0)
 
 class CountryAgent(Agent):
     def __init__(self, unique_id, model, country, silicon_export_rate=0, processing_capacity=0):
@@ -645,9 +671,13 @@ class NvidiaAgent(CompanyAgent):
         self.type = 'Nvidia'
         self.talent = random.randint(*self.company_data["Nvidia"]["talent_range"])
         self.resources = self.company_data["Nvidia"]["initial_resources"].copy()
-        self.chips_in_stock = 0
         self.capabilities_score = 0
+        self.order_book = deque()
         #print(f"NvidiaAgent {self.unique_id} instantiated.")
+
+    def receive_order(self, ordering_agent, quantity):
+        self.order_book.append((ordering_agent, quantity))  # Append the new order to the order book
+        #print(f"FabIntel has received an order of {quantity} chips from {ordering_agent.type}.")
 
     def r_and_d(self):
         # Calculate the increase in capabilities score based on money and talent
@@ -694,27 +724,9 @@ class NvidiaAgent(CompanyAgent):
         # Print the new chips count
         #print(f"Nvidia now has {self.resources['chips']} chips.")
 
-    def sell_chips(self, quantity):
-        if self.chips_in_stock >= quantity:
-            # Calculate the price of the chips (assuming 1 chip costs 20 money)
-            price = quantity * 20
-
-            # Subtract the chips from Nvidia's stock
-            self.chips_in_stock -= quantity
-
-            # Add money to Nvidia's resources
-            self.resources["money"] += price
-
-            #print(f"Nvidia sold {quantity} chips for {price} money.")
-        else:
-            print("Insufficient chips in stock to fulfill the order.")
-
     def step(self):
         print(f'Step function called for Nvidia')
         self.order_chips_from_TSMC()
-        # Sell chips to anonymous company
-        quantity_to_sell = random.randint(1, 10)
-        self.sell_chips(quantity_to_sell)
         self.r_and_d()
 
 
@@ -725,7 +737,6 @@ class IntelAgent(CompanyAgent):
         self.talent = random.randint(*self.company_data["Intel"]["talent_range"])
         self.resources = self.company_data["Intel"]["initial_resources"].copy()
         self.capabilities_score = 0
-        self.chips_in_stock = 0
         self.order_book = deque()
 
     def receive_payment(self, amount):
@@ -745,20 +756,6 @@ class IntelAgent(CompanyAgent):
         self.order_book.append((ordering_agent, quantity))  # Append the new order to the order book
         #print(f"FabIntel has received an order of {quantity} chips from {ordering_agent.type}.")
 
-    def sell_chips(self, quantity):
-        if self.chips_in_stock >= quantity:
-            # Calculate the price of the chips (assuming 1 chip costs 20 money)
-            price = quantity * 20
-
-            # Subtract the chips from Intel's stock
-            self.chips_in_stock -= quantity
-
-            # Add money to Nvidia's resources
-            self.resources["money"] += price
-
-            #print(f"Intel sold {quantity} chips for {price} money.")
-        else:
-            print("Insufficient chips in stock to fulfill the order.")
 
     def manufacture_chips(self):
         if len(self.order_book) == 0:  # If the order book is empty, there's nothing to manufacture
@@ -816,8 +813,6 @@ class IntelAgent(CompanyAgent):
         self.buy_resources_from(asml_agent, 'services', 10)
         self.buy_resources_from(siltronic_agent, 'wafers', 10)
         self.manufacture_chips()
-        quantity_to_sell = random.randint(1, 10)
-        self.sell_chips(quantity_to_sell)
         self.r_and_d()
 
 
@@ -911,7 +906,6 @@ class AMDAgent(CompanyAgent):
         self.type = 'AMD'
         self.talent = random.randint(*self.company_data["AMD"]["talent_range"])
         self.resources = self.company_data["AMD"]["initial_resources"].copy()
-        self.chips_in_stock = 0
         self.capabilities_score = 0
         #print(f"AMD {self.unique_id} instantiated.")
 
@@ -954,27 +948,9 @@ class AMDAgent(CompanyAgent):
         self.chips_in_stock += quantity
         #print(f"AMD now has {self.resources['chips']} chips.")
 
-    def sell_chips(self, quantity):
-        if self.chips_in_stock >= quantity:
-            # Calculate the price of the chips (assuming 1 chip costs 20 money)
-            price = quantity * 20
-
-            # Subtract the chips from AMD's stock
-            self.chips_in_stock -= quantity
-
-            # Add money to Nvidia's resources
-            self.resources["money"] += price
-
-            #print(f"AMD sold {quantity} chips for {price} money.")
-        else:
-            print("Insufficient chips in stock to fulfill the order.")
-
     def step(self):
         print(f'Step function called for AMD')
         self.order_chips_from_GlobalFoundries()
-        # Sell chips to anonymous company
-        quantity_to_sell = random.randint(1, 10)
-        self.sell_chips(quantity_to_sell)
         self.r_and_d()
 
 class GlobalFoundriesAgent(CompanyAgent):
@@ -1222,7 +1198,7 @@ class CustomerAgent(CompanyAgent):
         chosen_agent = random.choice(manufacturing_agents)
         # Assuming each manufacturing agent has a receive_order method
         chosen_agent.receive_order(self, quantity)
-        #print(f"{self.type} has placed an order of {quantity} chips to {chosen_agent.type}.")
+        print(f"{self.type} has placed an order of {quantity} chips to {chosen_agent.type}.")
 
     def receive_chips(self, quantity):
         self.resources['chips'] += quantity
@@ -1241,7 +1217,7 @@ class CustomerAgent(CompanyAgent):
         # Collect all manufacturing agents in the model's schedule
         manufacturing_agents = []
         for agent in self.model.schedule.agents:
-            if isinstance(agent, (SamsungSub, TSMCAgent, IntelAgent)):  # Add other manufacturing agents here
+            if isinstance(agent, (SamsungSub, NvidiaAgent, IntelAgent)):  # Add other manufacturing agents here
                 manufacturing_agents.append(agent)
         
         # Determine number of orders to place this step
@@ -1255,7 +1231,8 @@ class CustomerAgent(CompanyAgent):
             # Place order and make payment to the chosen agent
             order_quantity = random.randint(*self.company_data["CustomerAgent"]["order_range"])
             self.place_order(order_quantity, [chosen_agent])  # Pass chosen agent as a list to the place_order function
-            payment_amount = order_quantity  # Assuming 1 chip = 1 money
+            payment_amount = chosen_agent.set_price(order_quantity)  # Assuming 1 chip = 1 money
+            print(f"Payment amount for order of {order_quantity} chips from {chosen_agent.type}: {payment_amount}")
             self.pay_for_order(chosen_agent, payment_amount)  # Pay the chosen agent
 
 
