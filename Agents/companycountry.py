@@ -11,6 +11,19 @@ import yaml
 import numpy as np
 
 
+class PeopleAgent(Agent):
+    def __init__(self, unique_id, model):
+        self.unique_id = unique_id
+        self.model = model
+
+    def provide_data(self):
+        # This could be any function to generate data.
+        # In this simple example, it provides a constant amount each time it's called.
+        return 1000
+
+    def step(self):
+        self.provide_data()
+
 class CompanyAgent(Agent):
     def __init__(self, unique_id, model, country_agent, company_name):
         super().__init__(unique_id, model)
@@ -1319,6 +1332,171 @@ class SamsungSub(SamsungAgent):
 
         # At each step, the foundry receives a random order from a 'customer'
         self.manufacture_chips()
+
+class AmazonAgent(CompanyAgent):
+    def __init__(self, unique_id, model, country_agent, company_name):
+        super().__init__(unique_id, model, country_agent, company_name)
+        self.type = 'Amazon'
+        self.talent = random.randint(*self.company_data["Amazon"]["talent_range"])
+        self.resources = self.company_data["Amazon"]["initial_resources"].copy()
+        self.resources["data"] = 0
+        self.resources["AI_models"] = 0
+
+    def r_and_d(self):
+        # Calculate the increase in capabilities score based on money and talent
+        increase = self.resources["money"] * self.talent / 10
+        self.capabilities_score += increase
+
+
+    def order_chips_from_TSMC(self):
+        TSMC_agent = None
+        for agent in self.model.schedule.agents:
+            if isinstance(agent, TSMCAgent):
+                TSMC_agent = agent
+                break
+
+        if TSMC_agent is None:
+            raise Exception("TSMC agent not found in the model's schedule.")
+
+        # Calculate quantity of chips to order
+        # We'll use 10% of the available money, and 5 chips per point of capabilities
+        #Amazon will always order at least one chip
+        quantity = max(1, int(self.resources["money"] * 0.1) + self.capabilities_score * 2)
+
+        # Calculate the cost of the chips (assuming 1 chip costs 10 money)
+        cost = quantity * 10
+
+        # Check if Amazon has enough money
+        if self.resources["money"] >= cost:
+            self.resources["money"] -= cost
+        # Send the payment to TSMC
+            TSMC_agent.receive_payment(cost)
+        # Place the order with TSMC
+            TSMC_agent.receive_order(self, quantity)
+            #print(f"Amazon has ordered {quantity} chips from TSMC.")
+    
+    def receive_chips(self, quantity):
+        # Add the received chips to Amazon's resources
+        self.chips_in_stock += quantity
+        # Print the new chips count
+        #print(f"Amazon now has {self.resources['chips']} chips.")
+
+    def gather_data(self):
+        # Can modify this to model how much data is gathered, and from where
+
+        people_agent = None
+        for agent in self.model.schedule.agents:
+            if isinstance(agent, PeopleAgent):
+                people_agent = agent
+                break
+
+        if people_agent is None:
+            raise Exception("People agent not found in the model's schedule.")
+        self.resources["data"] += people_agent.provide_data()
+
+    def build_AI_models(self):
+        # Check if Amazon has enough data and chips to build an AI model
+        # This assumes 1 AI model requires 1 unit of data and 1 chip
+        while self.resources["data"] > 0 and self.resources["chips"] > 0:
+            # Consume data and chips
+            self.resources["data"] -= 1
+            self.resources["chips"] -= 1
+            # Produce an AI model
+            self.resources["AI_models"] += 1
+
+    def step(self):
+        print(f'Step function called for Amazon')
+        self.order_chips_from_TSMC()
+        self.r_and_d()
+        self.gather_data()
+        self.build_AI_models()
+
+class GoogleAgent(CompanyAgent):
+    def __init__(self, unique_id, model, country_agent, company_name):
+        super().__init__(unique_id, model, country_agent, company_name)
+        self.type = 'Google'
+        self.talent = random.randint(*self.company_data["Google"]["talent_range"])
+        self.resources = self.company_data["Google"]["initial_resources"].copy()
+        self.resources["data"] = 0
+        self.resources["AI_models"] = 0
+
+    def r_and_d(self):
+        # Calculate the increase in capabilities score based on money and talent
+        increase = self.resources["money"] * self.talent / 10
+        self.capabilities_score += increase
+
+
+    def order_chips_from_TSMC(self):
+        TSMC_agent = None
+        for agent in self.model.schedule.agents:
+            if isinstance(agent, TSMCAgent):
+                TSMC_agent = agent
+                break
+
+        if TSMC_agent is None:
+            raise Exception("TSMC agent not found in the model's schedule.")
+
+        # Calculate quantity of chips to order
+        # We'll use 10% of the available money, and 5 chips per point of capabilities
+        #Amazon will always order at least one chip
+        quantity = max(1, int(self.resources["money"] * 0.1) + self.capabilities_score * 2)
+
+        # Calculate the cost of the chips (assuming 1 chip costs 10 money)
+        cost = quantity * 10
+
+        # Check if Amazon has enough money
+        if self.resources["money"] >= cost:
+            self.resources["money"] -= cost
+        # Send the payment to TSMC
+            TSMC_agent.receive_payment(cost)
+        # Place the order with TSMC
+            TSMC_agent.receive_order(self, quantity)
+            #print(f"Google has ordered {quantity} chips from TSMC.")
+    
+    def receive_chips(self, quantity):
+        # Add the received chips to Google's resources
+        self.chips_in_stock += quantity
+        # Print the new chips count
+        #print(f"Google now has {self.resources['chips']} chips.")
+
+    def gather_data(self):
+        # Extract data from the 'people' agent
+        # Can modify this to model how much data is gathered, and from where
+
+        people_agent = None
+        for agent in self.model.schedule.agents:
+            if isinstance(agent, PeopleAgent):
+                people_agent = agent
+                break
+
+        if people_agent is None:
+            raise Exception("People agent not found in the model's schedule.")
+        self.resources["data"] += people_agent.provide_data()
+
+    def build_AI_models(self):
+        # Check if Google has enough data and chips to build an AI model
+        # This assumes 1 AI model requires 1 unit of data and 1 chip
+        while self.resources["data"] > 0 and self.resources["chips"] > 0:
+            # Consume data and chips
+            self.resources["data"] -= 1
+            self.resources["chips"] -= 1
+            # Produce an AI model
+            self.resources["AI_models"] += 1
+
+    def step(self):
+        print(f'Step function called for Google')
+        self.order_chips_from_TSMC()
+        self.r_and_d()
+        self.gather_data()
+        self.build_AI_models()
+
+class QualcommAgent(CompanyAgent):
+    def __init__(self, unique_id, model, country_agent, company_name):
+        super().__init__(unique_id, model, country_agent, company_name)
+        self.type = 'Qualcomm'
+        self.talent = random.randint(*self.company_data["Qualcomm"]["talent_range"])
+        self.resources = self.company_data["Qualcomm"]["initial_resources"].copy()
+
 
 class MediaTekAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent, company_name):

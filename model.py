@@ -1,4 +1,4 @@
-from Agents.companycountry import CountryAgent, CompanyAgent, NvidiaAgent, SMICAgent, InfineonAgent, RenesasAgent, TSMCAgent, IntelAgent, HuaHongAgent, STMicroelectronicsAgent, SonyAgent, MediaTekAgent, ASMLAgent, SumcoAgent, SamsungAgent, CustomerAgent, SamsungSub, SiltronicAgent, FujimiAgent, SKSiltronAgent, ShinEtsuAgent, GlobalFoundriesAgent, AMDAgent
+from Agents.companycountry import CountryAgent, CompanyAgent, NvidiaAgent, SMICAgent, InfineonAgent, RenesasAgent, TSMCAgent, IntelAgent, HuaHongAgent, STMicroelectronicsAgent, SonyAgent, MediaTekAgent, ASMLAgent, SumcoAgent, SamsungAgent, CustomerAgent, SamsungSub, SiltronicAgent, FujimiAgent, SKSiltronAgent, ShinEtsuAgent, GlobalFoundriesAgent, AMDAgent, QualcommAgent, AmazonAgent, GoogleAgent, PeopleAgent
 from Agents.communication import CommunicationChannel
 from Agents.resource import Resource
 from Agents.mine import MineAgent
@@ -45,10 +45,16 @@ class GameModel(Model):
     "SKSiltron": SKSiltronAgent,
     "ShinEtsu": ShinEtsuAgent,
     "GlobalFoundries": GlobalFoundriesAgent,
-    "AMD": AMDAgent}
+    "AMD": AMDAgent,
+    "Qualcomm": QualcommAgent,
+    "Amazon": AmazonAgent,
+    "Google" : GoogleAgent}
 
 
         agent_id = 0
+        people_agent = PeopleAgent(agent_id, self)
+        agent_id += 1  # Increment the agent ID
+        self.schedule.add(people_agent)
         # Loop over each country and its corresponding list of companies from the YAML file
         for country, companies in agent_dict["company_country_map"].items():
             country_config = agent_dict["countries"].get(country, {})
@@ -105,11 +111,11 @@ class GameModel(Model):
             
         #Initialize a data collector
         self.datacollector = DataCollector(
-            model_reporters={"Total Money": lambda m: sum(a.resources["money"] for a in m.schedule.agents),
-                            "Total Chips": lambda m: sum(a.resources["chips"] for a in m.schedule.agents),
+            model_reporters={"Total Money": lambda m: sum(a.resources["money"] for a in m.schedule.agents if not isinstance(a, PeopleAgent)),
+                            "Total Chips": lambda m: sum(a.resources["chips"] for a in m.schedule.agents if not isinstance(a, PeopleAgent)),
                             "Total Capabilities Growth Rate": lambda m: sum(a.capabilities_score for a in m.schedule.agents if isinstance(a, CompanyAgent)),
                             "GDP": lambda m: {agent.country: agent.calculate_gdp() for agent in m.schedule.agents if isinstance(agent, CountryAgent)}},
-            agent_reporters={"Agent Report": lambda a: a.report()} )
+            agent_reporters={"Agent Report": lambda a: a.report() if not isinstance(a, PeopleAgent) else None} )
 
     #def load_config(self, config_file):
         #with open(config_file, 'r') as f:
