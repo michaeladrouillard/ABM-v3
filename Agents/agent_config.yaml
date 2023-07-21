@@ -13,6 +13,15 @@ CompanyAgent:
   government_lobby_money_threshold: 50
   government_lobby_talent_threshold: 5
   competition_percentage: 0.1
+  OpenAI:
+    talent_range: [5, 10]
+    initial_resources: {'money': 10000, 'chips': 100, 'services': 2, 'data': 0, 'AI_models': 0} 
+  Meta:
+    talent_range: [5, 10]
+    initial_resources: {'money': 10000, 'chips': 100, 'services': 2, 'data': 0, 'AI_models': 0} 
+  Apple:
+    talent_range: [5, 10]
+    initial_resources: {'money': 10000, 'chips': 100, 'services': 2, 'data': 0, 'AI_models': 0}
   Google:
     talent_range: [5, 10]
     initial_resources: {'money': 10000, 'chips': 100, 'services': 2, 'data': 0, 'AI_models': 0}

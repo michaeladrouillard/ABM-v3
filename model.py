@@ -1,4 +1,4 @@
-from Agents.companycountry import CountryAgent, CompanyAgent, NvidiaAgent, SMICAgent, InfineonAgent, RenesasAgent, TSMCAgent, IntelAgent, HuaHongAgent, STMicroelectronicsAgent, SonyAgent, MediaTekAgent, ASMLAgent, SumcoAgent, SamsungAgent, CustomerAgent, SamsungSub, SiltronicAgent, FujimiAgent, SKSiltronAgent, ShinEtsuAgent, GlobalFoundriesAgent, AMDAgent, QualcommAgent, AmazonAgent, GoogleAgent, PeopleAgent
+from Agents.companycountry import CountryAgent, CompanyAgent, NvidiaAgent, SMICAgent, InfineonAgent, RenesasAgent, TSMCAgent, IntelAgent, HuaHongAgent, STMicroelectronicsAgent, SonyAgent, MediaTekAgent, ASMLAgent, SumcoAgent, SamsungAgent, CustomerAgent, SamsungSub, SiltronicAgent, FujimiAgent, SKSiltronAgent, ShinEtsuAgent, GlobalFoundriesAgent, AMDAgent, QualcommAgent, AmazonAgent, GoogleAgent, PeopleAgent, AppleAgent, MetaAgent, OpenAIAgent
 from Agents.communication import CommunicationChannel
 from Agents.resource import Resource
 from Agents.mine import MineAgent
@@ -48,7 +48,10 @@ class GameModel(Model):
     "AMD": AMDAgent,
     "Qualcomm": QualcommAgent,
     "Amazon": AmazonAgent,
-    "Google" : GoogleAgent}
+    "Google" : GoogleAgent,
+    "Apple": AppleAgent,
+    "Meta": MetaAgent,
+    "OpenAI": OpenAIAgent}
 
 
         agent_id = 0
