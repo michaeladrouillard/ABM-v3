@@ -8,7 +8,7 @@ import cProfile
 
 def run_model(agent_dict):
     model = GameModel(agent_dict)
-    for _ in tqdm(range(10), desc="Running model"):
+    for _ in tqdm(range(1000), desc="Running model"):
         model.step()
    
 
@@ -22,24 +22,8 @@ def run_model(agent_dict):
 
     # Collect and save agent data
     agent_data = model.datacollector.get_agent_vars_dataframe()
-
-    # attribute_cols = ['unique_id', 'talent', 'resources', 'prev_resources', 'country_agent',
-    #                   'company_name', 'capabilities_score', 'public_opinion', 'influence', 
-    #                   'project_launch_threshold', 'government_lobby_money_threshold', 
-    #                   'cooperation_thresholds', 'project_launch_cost', 
-    #                   'government_lobby_talent_threshold', 'competition_percentage']
-    
-    # for col in attribute_cols:
-    #     agent_data[col] = agent_data['Agent Attributes'].apply(lambda x: x.get(col))
-    #     agent_data['money'] = agent_data['resources'].apply(lambda x: x.get('money'))
-    #     agent_data['chips'] = agent_data['resources'].apply(lambda x: x.get('chips'))
-    #     agent_data = agent_data.drop('Agent Attributes', axis=1)
     agent_data.to_csv('agent_data.csv')
 
- # Plot model data
-    #model_data.plot()
-    #plt.show()
-    #model.visualize_network()
 def main():
 
     global agent_dict
@@ -55,10 +39,6 @@ if __name__ == "__main__":
 
 
 def plot_sensitivity_analysis(modelclass, agent_dict, lookback_steps_values, run_steps):
-    # model_class: your model class
-    # agent_dict: agent configuration dictionary
-    # lookback_steps_values: a list of lookback_steps values to test
-    # run_steps: number of steps to run each model
     
     selected_companies = ["Apple"]
     
@@ -87,5 +67,5 @@ def plot_sensitivity_analysis(modelclass, agent_dict, lookback_steps_values, run
     plt.show()
 
 lookback_steps_values = [5, 10, 15, 20]  # Or whatever values you're interested in
-run_steps = 100  # Or however many steps you want to run the model for
+run_steps = 1000  # Or however many steps you want to run the model for
 plot_sensitivity_analysis(GameModel, agent_dict, lookback_steps_values, run_steps)

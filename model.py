@@ -120,9 +120,6 @@ class GameModel(Model):
                             "GDP": lambda m: {agent.country: agent.calculate_gdp() for agent in m.schedule.agents if isinstance(agent, CountryAgent)}},
             agent_reporters={"Agent Report": lambda a: a.report() if not isinstance(a, PeopleAgent) else None} )
 
-    #def load_config(self, config_file):
-        #with open(config_file, 'r') as f:
-            #return yaml.safe_load(f)
         self.create_network(agent_dict["partnerships"])
         self.print_agents()
 
@@ -148,15 +145,8 @@ class GameModel(Model):
     def visualize_network(self):
         plt.figure(figsize=(10, 10))
         pos = nx.spring_layout(self.network)  # positions for all nodes
-
-        # nodes
         nx.draw_networkx_nodes(self.network, pos, node_size=700)
-
-        # edges
         nx.draw_networkx_edges(self.network, pos, width=2.0, edge_color='black')
-
-        # labels
-        #nx.draw_networkx_labels(self.network, pos, font_size=20, font_family='sans-serif')
 
         plt.axis('off')
         plt.show()

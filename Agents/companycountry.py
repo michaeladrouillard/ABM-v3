@@ -3,6 +3,7 @@ from mesa import Agent
 from mesa.time import RandomActivation
 import yaml
 from collections import deque
+import math
 
 import random
 from mesa import Agent
@@ -208,22 +209,18 @@ class CompanyAgent(Agent):
             self.resources["money"] -= self.project_launch_cost
             self.increase_capabilities()  # Launching a project increases capabilities
 
-            # This decreases the country's level. Decrease own public opinion level, using a percentage decrease for demonstration
-            self.country_agent.public_opinion *= 0.9
-            self.public_opinion *= 0.9
-            # Increase anxiety level of other agents
+            # Logic for sending messages
             for agent in self.model.schedule.agents:
                 if isinstance(agent, CountryAgent) and agent.unique_id != self.unique_id + 1:
                     agent.public_opinion += self.capabilities_score * 0.01  # Using capabilities score as a factor
             for channel in self.model.communication_channels.keys():
                 self.send_public_message(self.evaluate_message_content('money'))
+            
+            #Recording the net change
             net_change = self.resources["money"] - previous_money, self.resources["chips"] - previous_chips
             self.history["launch_project"].append(net_change)
             return True  # Successfully launched project
         else:
-            # Increase own PO and country level if project fails
-            self.country_agent.public_opinion += 1
-            self.public_opinion += 1 
             for channel in self.model.communication_channels.keys():
                 self.send_public_message(self.evaluate_message_content('money'))
             net_change = self.resources["money"] - previous_money, self.resources["chips"] - previous_chips
@@ -781,11 +778,10 @@ class IntelAgent(CompanyAgent):
         ordering_agent, quantity = self.order_book[0]  # Get the oldest order from the order book
 
         # Check how many chips intel can manufacture with its current resources
-        max_quantity = min(self.resources['wafers']//2, self.resources['services'], quantity) * self.capabilities_score
+        max_quantity = min(self.resources['wafers']//2, self.resources['services'], quantity) 
         
         # If intel can't manufacture any chips, return None
         if max_quantity <= 0:
-            #print(f"FabIntel does not have enough resources to manufacture the {quantity} chips ordered by {ordering_agent.type}.")
             return None
 
         # Subtract the used resources and add the manufactured chips
@@ -840,6 +836,11 @@ class TSMCAgent(CompanyAgent):
         self.resources = self.company_data["TSMC"]["initial_resources"].copy()
         self.order_book = deque()  # Initialize the order book as an empty deque
 
+    def r_and_d(self):
+        # Calculate the increase in capabilities score based on money and talent
+        increase = self.resources["money"] * self.talent / 10
+        self.capabilities_score += increase
+
     def receive_order(self, ordering_agent, quantity):
         self.order_book.append((ordering_agent, quantity))  # Append the new order to the order book
         #print(f"TSMC has received an order of {quantity} chips from {ordering_agent.type}.")
@@ -857,7 +858,7 @@ class TSMCAgent(CompanyAgent):
         ordering_agent, quantity = self.order_book[0]  # Get the oldest order from the order book
 
         # Check how many chips TSMC can manufacture with its current resources
-        max_quantity = min(self.resources['wafers']//2, self.resources['services'], quantity) * self.capabilities_score
+        max_quantity = min(self.resources['wafers']//2, self.resources['services'], quantity) 
         
         # If TSMC can't manufacture any chips, return None
         if max_quantity <= 0:
@@ -914,6 +915,8 @@ class TSMCAgent(CompanyAgent):
 
         # Manufacture chips and interact with ordering agents
         self.manufacture_chips()
+        self.r_and_d()
+        
 
 
 class AMDAgent(CompanyAgent):
@@ -977,6 +980,11 @@ class GlobalFoundriesAgent(CompanyAgent):
         self.resources = self.company_data["GlobalFoundries"]["initial_resources"].copy()
         self.order_book = deque()  # Initialize the order book as an empty deque
 
+    def r_and_d(self):
+        # Calculate the increase in capabilities score based on money and talent
+        increase = self.resources["money"] * self.talent / 10
+        self.capabilities_score += increase
+
     def receive_order(self, ordering_agent, quantity):
         self.order_book.append((ordering_agent, quantity))  # Append the new order to the order book
         #print(f"GlobalFoundries has received an order of {quantity} chips from {ordering_agent.type}.")
@@ -994,7 +1002,7 @@ class GlobalFoundriesAgent(CompanyAgent):
         ordering_agent, quantity = self.order_book[0]  # Get the oldest order from the order book
 
         # Check how many chips GlobalFoundries can manufacture with its current resources
-        max_quantity = min(self.resources['wafers']//2, self.resources['services'], quantity) * self.capabilities_score
+        max_quantity = min(self.resources['wafers']//2, self.resources['services'], quantity) 
         
         # If TSMC can't manufacture any chips, return None
         if max_quantity <= 0:
@@ -1051,6 +1059,7 @@ class GlobalFoundriesAgent(CompanyAgent):
 
         # Manufacture chips and interact with ordering agents
         self.manufacture_chips()
+        self.r_and_d()
 
 
 
@@ -1106,8 +1115,6 @@ class SiltronicAgent(CompanyAgent):
         self.resources = self.company_data["Siltronic"]["initial_resources"].copy()
 
     def manufacture_wafers(self):
-        # Assuming that tools are manufactured using some resource, say 'raw_materials'
-        # You can adjust the rate according to your simulation's rules
         if self.resources['money'] > 0:
             self.resources['money'] -= 1
             self.resources['wafers'] += 10
@@ -1272,6 +1279,11 @@ class SamsungSub(SamsungAgent):
     def receive_order(self, ordering_agent, quantity):
         self.order_book.append((ordering_agent, quantity))
         #print(f"{self.type} has received an order of {quantity} chips from {ordering_agent.type}.")
+    
+    def r_and_d(self):
+        # Calculate the increase in capabilities score based on money and talent
+        increase = self.resources["money"] * self.talent / 10
+        self.capabilities_score += increase
 
     def receive_payment(self, amount):
         self.resources['money'] += amount
@@ -1279,17 +1291,15 @@ class SamsungSub(SamsungAgent):
 
     def manufacture_chips(self):
         if len(self.order_book) == 0:  # If the order book is empty, there's nothing to manufacture
-            print(f"Order book is empty.")
             return None
         
         ordering_agent, quantity = self.order_book[0]  # Get the oldest order from the order book
 
         # Check how many chips it can manufacture with its current resources
-        max_quantity = min(self.resources['wafers']//2, self.resources['services'], quantity) * self.capabilities_score
+        max_quantity = min(self.resources['wafers']//2, self.resources['services'], quantity) 
         
         # If it can't manufacture any chips, return None
         if max_quantity <= 0:
-            #print(f"TSMC does not have enough resources to manufacture the {quantity} chips ordered by {ordering_agent.type}.")
             return None
 
         # Subtract the used resources and add the manufactured chips
@@ -1335,6 +1345,7 @@ class SamsungSub(SamsungAgent):
 
         # At each step, the foundry receives a random order from a 'customer'
         self.manufacture_chips()
+        self.r_and_d()
 
 class AmazonAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -1407,14 +1418,29 @@ class AmazonAgent(CompanyAgent):
         self.resources["data"] += people_agent.provide_data()
 
     def build_AI_models(self):
-        # Check if Amazon has enough data and chips to build an AI model
-        # This assumes 1 AI model requires 1 unit of data and 1 chip
-        while self.resources["data"] > 0 and self.resources["chips"] > 0:
-            # Consume data and chips
-            self.resources["data"] -= 1
-            self.resources["chips"] -= 1
-            # Produce an AI model
-            self.resources["AI_models"] += 1
+        TALENT_BUILD_COST = 1
+        TALENT_MAINTENANCE_COST = 0.1
+        maintenance_cost = TALENT_MAINTENANCE_COST * self.resources["AI_models"]
+        available_talent = self.resources["talent"] - maintenance_cost
+
+        while self.resources["data"] > 0 and self.resources["chips"] > 0 and available_talent >= TALENT_BUILD_COST:
+            potential_models = min(self.resources["data"], self.resources["chips"], available_talent // TALENT_BUILD_COST)
+
+            # Use math.log10() to apply a base-10 logarithm
+            models_to_build = int(math.log10(potential_models + 1))
+
+            models_to_build = min(models_to_build, potential_models)
+
+            self.resources["data"] -= models_to_build
+            self.resources["chips"] -= models_to_build
+            available_talent -= models_to_build * TALENT_BUILD_COST
+
+            self.resources["AI_models"] += models_to_build
+
+            if models_to_build == 0:
+                break
+
+        self.resources["talent"] = available_talent + maintenance_cost
 
     def step(self):
         print(f'Step function called for Amazon')
@@ -1492,14 +1518,29 @@ class GoogleAgent(CompanyAgent):
         self.resources["data"] += people_agent.provide_data()
 
     def build_AI_models(self):
-        # Check if Google has enough data and chips to build an AI model
-        # This assumes 1 AI model requires 1 unit of data and 1 chip
-        while self.resources["data"] > 0 and self.resources["chips"] > 0:
-            # Consume data and chips
-            self.resources["data"] -= 1
-            self.resources["chips"] -= 1
-            # Produce an AI model
-            self.resources["AI_models"] += 1
+        TALENT_BUILD_COST = 1
+        TALENT_MAINTENANCE_COST = 0.1
+        maintenance_cost = TALENT_MAINTENANCE_COST * self.resources["AI_models"]
+        available_talent = self.resources["talent"] - maintenance_cost
+
+        while self.resources["data"] > 0 and self.resources["chips"] > 0 and available_talent >= TALENT_BUILD_COST:
+            potential_models = min(self.resources["data"], self.resources["chips"], available_talent // TALENT_BUILD_COST)
+
+            # Use math.log10() to apply a base-10 logarithm
+            models_to_build = int(math.log10(potential_models + 1))
+
+            models_to_build = min(models_to_build, potential_models)
+
+            self.resources["data"] -= models_to_build
+            self.resources["chips"] -= models_to_build
+            available_talent -= models_to_build * TALENT_BUILD_COST
+
+            self.resources["AI_models"] += models_to_build
+
+            if models_to_build == 0:
+                break
+
+        self.resources["talent"] = available_talent + maintenance_cost
 
     def step(self):
         print(f'Step function called for Google')
@@ -1579,14 +1620,29 @@ class AppleAgent(CompanyAgent):
         self.resources["data"] += people_agent.provide_data()
 
     def build_AI_models(self):
-        # Check if Google has enough data and chips to build an AI model
-        # This assumes 1 AI model requires 1 unit of data and 1 chip
-        while self.resources["data"] > 0 and self.resources["chips"] > 0:
-            # Consume data and chips
-            self.resources["data"] -= 1
-            self.resources["chips"] -= 1
-            # Produce an AI model
-            self.resources["AI_models"] += 1
+        TALENT_BUILD_COST = 1
+        TALENT_MAINTENANCE_COST = 0.1
+        maintenance_cost = TALENT_MAINTENANCE_COST * self.resources["AI_models"]
+        available_talent = self.resources["talent"] - maintenance_cost
+
+        while self.resources["data"] > 0 and self.resources["chips"] > 0 and available_talent >= TALENT_BUILD_COST:
+            potential_models = min(self.resources["data"], self.resources["chips"], available_talent // TALENT_BUILD_COST)
+
+            # Use math.log10() to apply a base-10 logarithm
+            models_to_build = int(math.log10(potential_models + 1))
+
+            models_to_build = min(models_to_build, potential_models)
+
+            self.resources["data"] -= models_to_build
+            self.resources["chips"] -= models_to_build
+            available_talent -= models_to_build * TALENT_BUILD_COST
+
+            self.resources["AI_models"] += models_to_build
+
+            if models_to_build == 0:
+                break
+
+        self.resources["talent"] = available_talent + maintenance_cost
 
     def step(self):
         print(f'Step function called for Apple')
@@ -1663,14 +1719,29 @@ class MetaAgent(CompanyAgent):
         self.resources["data"] += people_agent.provide_data()
 
     def build_AI_models(self):
-        # Check if Meta has enough data and chips to build an AI model
-        # This assumes 1 AI model requires 1 unit of data and 1 chip
-        while self.resources["data"] > 0 and self.resources["chips"] > 0:
-            # Consume data and chips
-            self.resources["data"] -= 1
-            self.resources["chips"] -= 1
-            # Produce an AI model
-            self.resources["AI_models"] += 1
+        TALENT_BUILD_COST = 1
+        TALENT_MAINTENANCE_COST = 0.1
+        maintenance_cost = TALENT_MAINTENANCE_COST * self.resources["AI_models"]
+        available_talent = self.resources["talent"] - maintenance_cost
+
+        while self.resources["data"] > 0 and self.resources["chips"] > 0 and available_talent >= TALENT_BUILD_COST:
+            potential_models = min(self.resources["data"], self.resources["chips"], available_talent // TALENT_BUILD_COST)
+
+            # Use math.log10() to apply a base-10 logarithm
+            models_to_build = int(math.log10(potential_models + 1))
+
+            models_to_build = min(models_to_build, potential_models)
+
+            self.resources["data"] -= models_to_build
+            self.resources["chips"] -= models_to_build
+            available_talent -= models_to_build * TALENT_BUILD_COST
+
+            self.resources["AI_models"] += models_to_build
+
+            if models_to_build == 0:
+                break
+
+        self.resources["talent"] = available_talent + maintenance_cost
 
     def step(self):
         print(f'Step function called for Meta')
@@ -1835,14 +1906,29 @@ class OpenAIAgent(CompanyAgent):
         self.resources["data"] += people_agent.provide_data()
 
     def build_AI_models(self):
-        # Check if OpenAI has enough data and chips to build an AI model
-        # This assumes 1 AI model requires 1 unit of data and 1 chip
-        while self.resources["data"] > 0 and self.resources["chips"] > 0:
-            # Consume data and chips
-            self.resources["data"] -= 1
-            self.resources["chips"] -= 1
-            # Produce an AI model
-            self.resources["AI_models"] += 1
+        TALENT_BUILD_COST = 1
+        TALENT_MAINTENANCE_COST = 0.1
+        maintenance_cost = TALENT_MAINTENANCE_COST * self.resources["AI_models"]
+        available_talent = self.resources["talent"] - maintenance_cost
+
+        while self.resources["data"] > 0 and self.resources["chips"] > 0 and available_talent >= TALENT_BUILD_COST:
+            potential_models = min(self.resources["data"], self.resources["chips"], available_talent // TALENT_BUILD_COST)
+
+            # Use math.log10() to apply a base-10 logarithm
+            models_to_build = int(math.log10(potential_models + 1))
+
+            models_to_build = min(models_to_build, potential_models)
+
+            self.resources["data"] -= models_to_build
+            self.resources["chips"] -= models_to_build
+            available_talent -= models_to_build * TALENT_BUILD_COST
+
+            self.resources["AI_models"] += models_to_build
+
+            if models_to_build == 0:
+                break
+
+        self.resources["talent"] = available_talent + maintenance_cost
 
     def step(self):
         print(f'Step function called for OpenAI')
