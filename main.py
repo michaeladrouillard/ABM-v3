@@ -40,7 +40,7 @@ if __name__ == "__main__":
 
 def plot_sensitivity_analysis(modelclass, agent_dict, lookback_steps_values, run_steps):
     
-    selected_companies = ["Apple"]
+    selected_companies = ["TSMC"]
     
     for value in lookback_steps_values:
         # Update the 'lookback_steps' value in the agent_dict

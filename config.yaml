@@ -33,7 +33,7 @@ CompanyAgent:
 
 
 company_country_map:
-  US: [Nvidia, Intel, FabIntel, SKSiltron, GlobalFoundries, AMD, Qualcomm, Amazon, Google, Apple, Meta, OpenAI]
+  US: [Nvidia, Intel, FabIntel, SKSiltron, GlobalFoundries, AMD, Qualcomm, Amazon, Google, Apple, Meta, OpenAI, TexasInstruments]
   Taiwan: [TSMC, MediaTek]
   China: [SMIC, HuaHong]
   EU: [Infineon, STMicroelectronics, ASML]

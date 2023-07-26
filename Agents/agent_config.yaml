@@ -37,6 +37,9 @@ CompanyAgent:
   Intel:
     talent_range: [5, 10]
     initial_resources: {'money': 100, 'chips': 100, 'services': 2, 'wafers': 100}
+  TexasInstruments:
+    talent_range: [5, 10]
+    initial_resources: {'money': 100, 'chips': 100, 'services': 2, 'wafers': 100}
   CustomerAgent:
     talent_range: [5, 10]
     initial_resources: {'money': 1000, 'chips': 100, 'services': 2, 'wafers': 100}
@@ -64,31 +67,31 @@ CompanyAgent:
     initial_resources: {'money': 150, 'chips': 150, 'services': 2, 'wafers': 500}
   MediaTek:
     talent_range: [7, 12]
-    initial_resources: {'money': 150, 'chips': 150} 
+    initial_resources: {'money': 150, 'chips': 150, 'services': 0} 
     # more TSMC-specific configurations here...
   Infineon:
     talent_range: [7, 12]
-    initial_resources: {'money': 150, 'chips': 150}
+    initial_resources: {'money': 150, 'chips': 150, 'wafers': 100, 'services': 0}
     # more Infineon-specific configurations here...
   STMicroelectronics:
     talent_range: [7, 12]
-    initial_resources: {'money': 150, 'chips': 150}
+    initial_resources: {'money': 150, 'chips': 150, 'wafers': 100, 'services': 0}
     # more Infineon-specific configurations here...
   Renesas:
     talent_range: [7, 12]
-    initial_resources: {'money': 150, 'chips': 150}
+    initial_resources: {'money': 150, 'chips': 150, 'wafers': 100, 'services': 0}
     # more Renesas-specific configurations here...
   Sony:
     talent_range: [7, 12]
-    initial_resources: {'money': 150, 'chips': 150}
+    initial_resources: {'money': 150, 'chips': 150, 'wafers': 100,'services': 0}
     # more Renesas-specific configurations here...
   SMIC:
     talent_range: [7, 12]
-    initial_resources: {'money': 150, 'chips': 150}
+    initial_resources: {'money': 150, 'chips': 150, 'wafers': 100, 'services': 0}
     # more SMIC-specific configurations here...
   HuaHong:
     talent_range: [7, 12]
-    initial_resources: {'money': 150, 'chips': 150}
+    initial_resources: {'money': 150, 'chips': 150, 'wafers': 100, 'services': 0}
     # more Huahong-specific configurations here...
   Sumco:
     talent_range: [7, 12]
