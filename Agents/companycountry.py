@@ -4,6 +4,9 @@ from mesa.time import RandomActivation
 import yaml
 from collections import deque
 import math
+import logging
+logging.basicConfig(filename='agent_actions.log', level=logging.INFO)
+
 
 import random
 from mesa import Agent
@@ -28,7 +31,9 @@ class PeopleAgent(Agent):
 class CompanyAgent(Agent):
     def __init__(self, unique_id, model, country_agent, company_name):
         super().__init__(unique_id, model)
-
+        self.launch_project_count = 0
+        self.lobby_government_count = 0
+        self.compete_with_count = 0
         # Load yaml file
         with open('Agents/agent_config.yaml') as yaml_file:
             self.data = yaml.safe_load(yaml_file)
@@ -44,7 +49,6 @@ class CompanyAgent(Agent):
         self.country_agent = country_agent 
         self.company_name = company_name  
         self.capabilities_score = 0
-        self.public_opinion = 0
         self.partners = []
         self.chip_price_history = [] 
         self.chips_in_stock = 0
@@ -59,13 +63,44 @@ class CompanyAgent(Agent):
         self.competition_percentage = self.company_data["competition_percentage"]
         self.history = {"launch_project": [], "lobby_government": [], "cooperate_with_country": [], "cooperate_with_company": [], "compete_with_company": []}
 
-        #print(f'Initialized company {self.company_name}, country_agent type: {type(self.country_agent)}')
 
-    # def receive_order(self, ordering_agent, quantity):
-    #     self.order_book.append((ordering_agent, quantity))  # Append the new order to the order book
-    #     #print(f"FabIntel has received an order of {quantity} chips from {ordering_agent.type}.")
+    def calculate_expenses(self):
+        # Use percentages or fixed values from the company_data as cost factors
+        rd_cost_factor = self.company_data["rd_cost_factor"]
+        production_cost_factor = self.company_data["production_cost_factor"]
+        marketing_cost_factor = self.company_data["marketing_cost_factor"]
+        administration_cost_factor = self.company_data["administration_cost_factor"]
+        logistics_cost_factor = self.company_data["logistics_cost_factor"]
+        infrastructure_cost_factor = self.company_data["infrastructure_cost_factor"]
+        personnel_cost_factor = self.company_data["personnel_cost_factor"]
 
-    
+
+        # The expenses are calculated as a percentage of the company's monetary resources
+        rd_expense = self.resources["money"] * rd_cost_factor
+        production_expense = self.resources["money"] * production_cost_factor
+        marketing_expense = self.resources["money"] * marketing_cost_factor
+        administration_expense = self.resources["money"] * administration_cost_factor
+        logistics_expense = self.resources["money"] * logistics_cost_factor
+        infrastructure_expense = self.resources["money"] * infrastructure_cost_factor
+        personnel_expense = self.resources["money"] * personnel_cost_factor
+
+        total_expenses = personnel_expense + rd_expense + production_expense + marketing_expense + administration_expense + logistics_expense + infrastructure_expense
+
+        # Deduct expenses from the company's resources, allowing the money to go negative to represent debt
+        self.resources["money"] -= total_expenses
+        print(f"{self.company_name} Expenses:")
+        print(f"R&D: {rd_expense}")
+        print(f"Production: {production_expense}")
+        print(f"Marketing: {marketing_expense}")
+        print(f"Administration: {administration_expense}")
+        print(f"Logistics: {logistics_expense}")
+        print(f"Infrastructure: {infrastructure_expense}")
+        print(f"Total expenses: {total_expenses}")
+        print(f"Remaining money (including debt): {self.resources['money']}")
+
+        return total_expenses
+
+
     def set_price(self, quantity):
             # Calculate the price of the chips based on the demand and supply
             # Use the historical price if available
@@ -125,16 +160,12 @@ class CompanyAgent(Agent):
 
     def increase_capabilities(self):
       #increase capabilities score
-      self.capabilities_score += self.resources["chips"] * 0.1
+      self.capabilities_score += self.resources["chips"] * 0.1 + self.talent * 0.1
 
     def cooperate_with(self, other_agent):
         if (self.resources["money"] > self.cooperation_thresholds["money"] and self.cooperation_thresholds["chips"]):
             self.resources["money"] -= self.cooperation_thresholds["money"]
             #other_agent.resources["chips"] -= self.cooperation_thresholds["chips"]
-
-            # Decrease anxiety score due to successful cooperation
-            self.public_opinion -= 1
-            other_agent.public_opinion -= 1
 
             return True  # Cooperation was successful
         else:
@@ -175,12 +206,6 @@ class CompanyAgent(Agent):
         # Calculate the influence factor. If the sender is a CompanyAgent, use its influence, otherwise use 1.
         influence_factor = sender.influence if isinstance(sender, CompanyAgent) else 1
 
-        # Update public opinion score based on the message content
-        if "More Money" in message or "More Chips" in message:
-            self.public_opinion += 1 * influence_factor
-        elif "Less Money" in message or "Less Chips" in message:
-            self.public_opinion -= 1 * influence_factor
-
 
     def evaluate_message_content(self, message_type):
         """Evaluate message content based on the message type and changes in resources."""
@@ -203,6 +228,7 @@ class CompanyAgent(Agent):
 
 
     def launch_project(self):
+        self.launch_project_count += 1
         previous_money = self.resources["money"]
         previous_chips = self.resources["chips"]
         if self.resources["money"] >= self.project_launch_cost:  # Assuming launching a project requires 30 money
@@ -212,7 +238,7 @@ class CompanyAgent(Agent):
             # Logic for sending messages
             for agent in self.model.schedule.agents:
                 if isinstance(agent, CountryAgent) and agent.unique_id != self.unique_id + 1:
-                    agent.public_opinion += self.capabilities_score * 0.01  # Using capabilities score as a factor
+                    self.capabilities_score * 0.01  # Using capabilities score as a factor
             for channel in self.model.communication_channels.keys():
                 self.send_public_message(self.evaluate_message_content('money'))
             
@@ -229,7 +255,8 @@ class CompanyAgent(Agent):
 
 
     def lobby_government(self):
-        print(f'Lobbying government, type of self.country_agent: {type(self.country_agent)}')
+        self.lobby_government_count += 1
+        #print(f'Lobbying government, type of self.country_agent: {type(self.country_agent)}')
         if self.talent >= self.government_lobby_talent_threshold:  # Lobbying government requires talent score >= 5
             # Request the government for resources
             potential_gain = random.randint(10, 20), random.randint(5, 10)  # Potential increase in money and chips
@@ -238,6 +265,7 @@ class CompanyAgent(Agent):
         return False  # Failed to lobby government due to insufficient talent
 
     def compete_with(self, other_company):
+        self.compete_with_count += 1
         previous_money = self.resources["money"]
         previous_chips = self.resources["chips"]
         # Companies compete based on their capabilities
@@ -367,6 +395,7 @@ class CompanyAgent(Agent):
 
 
     def choose_action(self):
+        #logging.info(f"{self.__class__.__name__} with id {self.unique_id} is performing choose_action.")
         # Find all other company agents
         other_companies = [agent for agent in self.model.schedule.agents if isinstance(agent, CompanyAgent) and agent is not self]
 
@@ -416,6 +445,7 @@ class CompanyAgent(Agent):
    # Keep the chip price history within the lookback steps
         if len(self.chip_price_history) > self.lookback_steps:
             self.chip_price_history.pop(0)
+        self.calculate_expenses()
 
 class CountryAgent(Agent):
     def __init__(self, unique_id, model, country, silicon_export_rate=0, processing_capacity=0):
@@ -430,7 +460,6 @@ class CountryAgent(Agent):
 
         self.resources = country_data["initial_resources"].copy() 
         self.country = country  # Country the agent belongs to
-        self.public_opinion = 0  # The anxiety level of the agent
         self.company = None  # The CompanyAgent associated with this country, initialized to None
         self.debt = 0
         self.gdp = 0  # Initialize GDP to 0
@@ -507,11 +536,7 @@ class CountryAgent(Agent):
         # Calculate the influence factor. If the sender is a CompanyAgent, use its influence, otherwise use 1.
         influence_factor = sender.influence if isinstance(sender, CompanyAgent) else 1
 
-        # Update public opinion score based on the message content
-        if "More Money" in message or "More Chips" in message:
-            self.public_opinion -= 1 * influence_factor
-        elif "Less Money" in message or "Less Chips" in message:
-            self.public_opinion += 1 * influence_factor
+
 
 
     def evaluate_message_content(self, message_type):
@@ -612,27 +637,28 @@ class CountryAgent(Agent):
             if request_info["steps_remaining"] > 0:
                 continue  # Skip this request if it's not ready to be processed yet
 
-            print(f'Processing request for {company}: {request_info}')
+            #print(f'Processing request for {company}: {request_info}')
             money_gain, chips_gain = request_info["potential_gain"]
 
             # Decision-making: probabilistic
             approval_probability = np.random.uniform(0, 1)  # Random float between 0 and 1
             if approval_probability < 0.6:  #chance of approval
-                print(f'Before transaction - Country money: {self.resources["money"]}, chips: {self.resources["chips"]}, Company money: {company.resources["money"]}, chips: {company.resources["chips"]}')
+                #print(f'Before transaction - Country money: {self.resources["money"]}, chips: {self.resources["chips"]}, Company money: {company.resources["money"]}, chips: {company.resources["chips"]}')
                 self.resources["money"] -= money_gain  # Decrease the country's resources
                 self.resources["chips"] -= chips_gain
                 company.resources["money"] += money_gain  # Increase the company's resources
                 company.resources["chips"] += chips_gain
-                print(f'After transaction - Country money: {self.resources["money"]}, chips: {self.resources["chips"]}, Company money: {company.resources["money"]}, chips: {company.resources["chips"]}')
-                print(f'Processed request for {company}: {request_info}, approval probability: {approval_probability}')
+                #print(f'After transaction - Country money: {self.resources["money"]}, chips: {self.resources["chips"]}, Company money: {company.resources["money"]}, chips: {company.resources["chips"]}')
+                #print(f'Processed request for {company}: {request_info}, approval probability: {approval_probability}')
             else:
-                print(f'Request not approved for {company}: {request_info}, approval probability: {approval_probability}')
-            del self.lobby_requests[company]  # Remove processed requests
+                #print(f'Request not approved for {company}: {request_info}, approval probability: {approval_probability}')
+                del self.lobby_requests[company]  # Remove processed requests
 
 
 
 
     def choose_action(self):
+        logging.info(f"{self.__class__.__name__} with id {self.unique_id} is performing choose_action.")
         # Find all other country agents
         other_countries = [agent for agent in self.model.schedule.agents if isinstance(agent, CountryAgent) and agent is not self]
 
@@ -738,9 +764,15 @@ class NvidiaAgent(CompanyAgent):
         #print(f"Nvidia now has {self.resources['chips']} chips.")
 
     def step(self):
-        print(f'Step function called for Nvidia')
+        #print(f'Step function called for Nvidia')
         self.order_chips_from_TSMC()
         self.r_and_d()
+        self.choose_action()
+        self.prev_resources = self.resources.copy()
+        self.update_trend_and_horizon()
+   # Keep the chip price history within the lookback steps
+        if len(self.chip_price_history) > self.lookback_steps:
+            self.chip_price_history.pop(0)
 
 
 class IntelAgent(CompanyAgent):
@@ -826,6 +858,12 @@ class IntelAgent(CompanyAgent):
         self.buy_resources_from(siltronic_agent, 'wafers', 10)
         self.manufacture_chips()
         self.r_and_d()
+        self.choose_action()
+        self.prev_resources = self.resources.copy()
+        self.update_trend_and_horizon()
+   # Keep the chip price history within the lookback steps
+        if len(self.chip_price_history) > self.lookback_steps:
+            self.chip_price_history.pop(0)
 
 
 class TSMCAgent(CompanyAgent):
@@ -916,6 +954,13 @@ class TSMCAgent(CompanyAgent):
         # Manufacture chips and interact with ordering agents
         self.manufacture_chips()
         self.r_and_d()
+        self.choose_action()
+        self.prev_resources = self.resources.copy()
+        self.update_trend_and_horizon()
+   # Keep the chip price history within the lookback steps
+        if len(self.chip_price_history) > self.lookback_steps:
+            self.chip_price_history.pop(0)
+        self.calculate_expenses()
         
 
 
@@ -927,6 +972,13 @@ class AMDAgent(CompanyAgent):
         self.resources = self.company_data["AMD"]["initial_resources"].copy()
         self.capabilities_score = 0
         #print(f"AMD {self.unique_id} instantiated.")
+   
+    def receive_payment(self, amount):
+        self.resources['money'] += amount
+
+    def receive_order(self, ordering_agent, quantity):
+        self.order_book.append((ordering_agent, quantity))  # Append the new order to the order book
+        #print(f"FabIntel has received an order of {quantity} chips from {ordering_agent.type}.")
 
     def r_and_d(self):
         # Calculate the increase in capabilities score based on money and talent
@@ -968,9 +1020,15 @@ class AMDAgent(CompanyAgent):
         #print(f"AMD now has {self.resources['chips']} chips.")
 
     def step(self):
-        print(f'Step function called for AMD')
+        #print(f'Step function called for AMD')
         self.order_chips_from_GlobalFoundries()
         self.r_and_d()
+        self.choose_action()
+        self.prev_resources = self.resources.copy()
+        self.update_trend_and_horizon()
+   # Keep the chip price history within the lookback steps
+        if len(self.chip_price_history) > self.lookback_steps:
+            self.chip_price_history.pop(0)
 
 class GlobalFoundriesAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -1060,6 +1118,12 @@ class GlobalFoundriesAgent(CompanyAgent):
         # Manufacture chips and interact with ordering agents
         self.manufacture_chips()
         self.r_and_d()
+        self.choose_action()
+        self.prev_resources = self.resources.copy()
+        self.update_trend_and_horizon()
+   # Keep the chip price history within the lookback steps
+        if len(self.chip_price_history) > self.lookback_steps:
+            self.chip_price_history.pop(0)
 
 
 
@@ -1081,14 +1145,18 @@ class ASMLAgent(CompanyAgent):
     def step(self):
         # Manufacture services
         self.manufacture_services()
+        self.choose_action()
+        self.prev_resources = self.resources.copy()
+        self.update_trend_and_horizon()
+   # Keep the chip price history within the lookback steps
+        if len(self.chip_price_history) > self.lookback_steps:
+            self.chip_price_history.pop(0)
 
-        # # Sell tools to TSMC or any other interested agents in the model's schedule
-        # for agent in self.model.schedule.agents:
-        #     if isinstance(agent, TSMCAgent) and self.resources['services'] > 0:
-        #         self.sell_services_to(agent, 5)  # Sell one tool at a time
+
+
 
         # Print the current services supply
-        print(f"Asml's services supply: {self.resources['services']}")
+        #print(f"Asml's services supply: {self.resources['services']}")
 
 class FujimiAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -1106,6 +1174,12 @@ class FujimiAgent(CompanyAgent):
     def step(self):
         self.manufacture_services()
         #print(f"Fujimi's services supply: {self.resources['services']}")
+        self.choose_action()
+        self.prev_resources = self.resources.copy()
+        self.update_trend_and_horizon()
+   # Keep the chip price history within the lookback steps
+        if len(self.chip_price_history) > self.lookback_steps:
+            self.chip_price_history.pop(0)
 
 class SiltronicAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -1121,7 +1195,7 @@ class SiltronicAgent(CompanyAgent):
 
     def step(self):
         # Print the current wafer supply
-        print(f"Siltronic's wafer supply: {self.resources['wafers']}")
+        #print(f"Siltronic's wafer supply: {self.resources['wafers']}")
         fujimi_agent = None
         for agent in self.model.schedule.agents:
             if isinstance(agent, FujimiAgent) and fujimi_agent is None:
@@ -1131,6 +1205,12 @@ class SiltronicAgent(CompanyAgent):
                 break
         # Buy tools from the fujimi Agent
         self.buy_resources_from(fujimi_agent, 'services', 10)
+        self.choose_action()
+        self.prev_resources = self.resources.copy()
+        self.update_trend_and_horizon()
+   # Keep the chip price history within the lookback steps
+        if len(self.chip_price_history) > self.lookback_steps:
+            self.chip_price_history.pop(0)
 
 
 
@@ -1154,6 +1234,12 @@ class SumcoAgent(CompanyAgent):
         # Print the current wafer supply
         self.manufacture_wafers()
         #print(f"Sumco's wafer supply: {self.resources['wafers']}")
+        self.choose_action()
+        self.prev_resources = self.resources.copy()
+        self.update_trend_and_horizon()
+   # Keep the chip price history within the lookback steps
+        if len(self.chip_price_history) > self.lookback_steps:
+            self.chip_price_history.pop(0)
 
 
 class SKSiltronAgent(CompanyAgent):
@@ -1173,7 +1259,7 @@ class SKSiltronAgent(CompanyAgent):
 
     def step(self):
         # Print the current wafer supply
-        print(f"SKSiltron's wafer supply: {self.resources['wafers']}")
+        #print(f"SKSiltron's wafer supply: {self.resources['wafers']}")
         self.manufacture_wafers()
         shinetsu_agent = None
         for agent in self.model.schedule.agents:
@@ -1184,6 +1270,12 @@ class SKSiltronAgent(CompanyAgent):
                 break
         # Buy tools from the fujimi Agent
         self.buy_resources_from(shinetsu_agent, 'silicon', 10)
+        self.choose_action()
+        self.prev_resources = self.resources.copy()
+        self.update_trend_and_horizon()
+   # Keep the chip price history within the lookback steps
+        if len(self.chip_price_history) > self.lookback_steps:
+            self.chip_price_history.pop(0)
 
 
 class ShinEtsuAgent(CompanyAgent):
@@ -1201,9 +1293,13 @@ class ShinEtsuAgent(CompanyAgent):
             self.resources['silicon'] += 10
 
     def step(self):
-        # Print the current wafer supply
-        #print(f"ShinEtsu's silicon supply: {self.resources['silicon']}")
         self.process_silicon()
+        self.choose_action()
+        self.prev_resources = self.resources.copy()
+        self.update_trend_and_horizon()
+   # Keep the chip price history within the lookback steps
+        if len(self.chip_price_history) > self.lookback_steps:
+            self.chip_price_history.pop(0)
 
 
 
@@ -1215,13 +1311,12 @@ class CustomerAgent(CompanyAgent):
         self.talent = random.randint(*self.company_data["CustomerAgent"]["talent_range"])
         self.resources = self.company_data["CustomerAgent"]["initial_resources"].copy()
         self.initial_money = self.resources['money']  
-        #print(f"Customer agent {self.unique_id} created.")
+
 
     def place_order(self, quantity, manufacturing_agents):
         chosen_agent = random.choice(manufacturing_agents)
         # Assuming each manufacturing agent has a receive_order method
         chosen_agent.receive_order(self, quantity)
-        print(f"{self.type} has placed an order of {quantity} chips to {chosen_agent.type}.")
 
     def receive_chips(self, quantity):
         self.resources['chips'] += quantity
@@ -1233,14 +1328,14 @@ class CustomerAgent(CompanyAgent):
             manufacturing_agent.receive_payment(amount)
             #print(f"{self.type} has paid {amount} money to {manufacturing_agent.type}.")
         else:
-            print(f"{self.type} does not have enough money to pay {amount} to {manufacturing_agent.type}.")
+            pass #print(f"{self.type} does not have enough money to pay {amount} to {manufacturing_agent.type}.")
 
     def step(self):
         self.resources['money'] = self.initial_money  # Replenish money at the start of each step
         # Collect all manufacturing agents in the model's schedule
         manufacturing_agents = []
         for agent in self.model.schedule.agents:
-            if isinstance(agent, (SamsungSub, NvidiaAgent, IntelAgent, TexasInstrumentsAgent, SMICAgent, MediaTekAgent, InfineonAgent, RenesasAgent, SonyAgent, HuaHongAgent)):  # Add other manufacturing agents here
+            if isinstance(agent, (InfineonAgent, AMDAgent, TSMCAgent, NvidiaAgent, IntelAgent, TexasInstrumentsAgent, SMICAgent, MediaTekAgent, RenesasAgent, SonyAgent, HuaHongAgent)):  # Add other manufacturing agents here
                 manufacturing_agents.append(agent)
         
         # Determine number of orders to place this step
@@ -1255,7 +1350,7 @@ class CustomerAgent(CompanyAgent):
             order_quantity = random.randint(*self.company_data["CustomerAgent"]["order_range"])
             self.place_order(order_quantity, [chosen_agent])  # Pass chosen agent as a list to the place_order function
             payment_amount = chosen_agent.set_price(order_quantity)  # Assuming 1 chip = 1 money
-            print(f"Payment amount for order of {order_quantity} chips from {chosen_agent.type}: {payment_amount}")
+            #print(f"Payment amount for order of {order_quantity} chips from {chosen_agent.type}: {payment_amount}")
             self.pay_for_order(chosen_agent, payment_amount)  # Pay the chosen agent
 
 
@@ -1346,6 +1441,12 @@ class SamsungSub(SamsungAgent):
         # At each step, the foundry receives a random order from a 'customer'
         self.manufacture_chips()
         self.r_and_d()
+        self.choose_action()
+        self.prev_resources = self.resources.copy()
+        self.update_trend_and_horizon()
+   # Keep the chip price history within the lookback steps
+        if len(self.chip_price_history) > self.lookback_steps:
+            self.chip_price_history.pop(0)
 
 class AmazonAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -1443,12 +1544,18 @@ class AmazonAgent(CompanyAgent):
         self.resources["talent"] = available_talent + maintenance_cost
 
     def step(self):
-        print(f'Step function called for Amazon')
+        #print(f'Step function called for Amazon')
         self.order_chips_from_TSMC()
         self.r_and_d()
         self.gather_data()
         self.build_AI_models()
         self.generate_revenue()
+        self.choose_action()
+        self.prev_resources = self.resources.copy()
+        self.update_trend_and_horizon()
+   # Keep the chip price history within the lookback steps
+        if len(self.chip_price_history) > self.lookback_steps:
+            self.chip_price_history.pop(0)
 
 class GoogleAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -1543,12 +1650,18 @@ class GoogleAgent(CompanyAgent):
         self.resources["talent"] = available_talent + maintenance_cost
 
     def step(self):
-        print(f'Step function called for Google')
+        #print(f'Step function called for Google')
         self.order_chips_from_TSMC()
         self.r_and_d()
         self.gather_data()
         self.build_AI_models()
         self.generate_ad_revenue()
+        self.choose_action()
+        self.prev_resources = self.resources.copy()
+        self.update_trend_and_horizon()
+   # Keep the chip price history within the lookback steps
+        if len(self.chip_price_history) > self.lookback_steps:
+            self.chip_price_history.pop(0)
 
 class AppleAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -1645,12 +1758,18 @@ class AppleAgent(CompanyAgent):
         self.resources["talent"] = available_talent + maintenance_cost
 
     def step(self):
-        print(f'Step function called for Apple')
+        #print(f'Step function called for Apple')
         self.order_chips_from_TSMC()
         self.r_and_d()
         self.gather_data()
         self.build_AI_models()
         self.generate_revenue()
+        self.choose_action()
+        self.prev_resources = self.resources.copy()
+        self.update_trend_and_horizon()
+   # Keep the chip price history within the lookback steps
+        if len(self.chip_price_history) > self.lookback_steps:
+            self.chip_price_history.pop(0)
 
 
 class MetaAgent(CompanyAgent):
@@ -1744,12 +1863,18 @@ class MetaAgent(CompanyAgent):
         self.resources["talent"] = available_talent + maintenance_cost
 
     def step(self):
-        print(f'Step function called for Meta')
+        #print(f'Step function called for Meta')
         self.r_and_d()
         self.gather_data()
         self.build_AI_models()
         self.order_chips()
         self.generate_ad_revenue()
+        self.choose_action()
+        self.prev_resources = self.resources.copy()
+        self.update_trend_and_horizon()
+   # Keep the chip price history within the lookback steps
+        if len(self.chip_price_history) > self.lookback_steps:
+            self.chip_price_history.pop(0)
 
 
 
@@ -1832,9 +1957,15 @@ class QualcommAgent(CompanyAgent):
         #print(f"Qualcommnow has {self.resources['chips']} chips.")
 
     def step(self):
-        print(f'Step function called for Qualcomm')
+        #print(f'Step function called for Qualcomm')
         self.order_chips()
         self.r_and_d()
+        self.choose_action()
+        self.prev_resources = self.resources.copy()
+        self.update_trend_and_horizon()
+   # Keep the chip price history within the lookback steps
+        if len(self.chip_price_history) > self.lookback_steps:
+            self.chip_price_history.pop(0)
 
 
 class OpenAIAgent(CompanyAgent):
@@ -1931,12 +2062,18 @@ class OpenAIAgent(CompanyAgent):
         self.resources["talent"] = available_talent + maintenance_cost
 
     def step(self):
-        print(f'Step function called for OpenAI')
+        #print(f'Step function called for OpenAI')
         self.r_and_d()
         self.gather_data()
         self.build_AI_models()
         self.order_chips()
         self.generate_revenue()
+        self.choose_action()
+        self.prev_resources = self.resources.copy()
+        self.update_trend_and_horizon()
+   # Keep the chip price history within the lookback steps
+        if len(self.chip_price_history) > self.lookback_steps:
+            self.chip_price_history.pop(0)
 
 
 class MediaTekAgent(CompanyAgent):
@@ -2002,9 +2139,15 @@ class MediaTekAgent(CompanyAgent):
         #print(f"MediaTek now has {self.resources['chips']} chips.")
 
     def step(self):
-        print(f'Step function called for MediaTek')
+        #print(f'Step function called for MediaTek')
         self.order_chips_from_TSMC()
         self.r_and_d()
+        self.choose_action()
+        self.prev_resources = self.resources.copy()
+        self.update_trend_and_horizon()
+   # Keep the chip price history within the lookback steps
+        if len(self.chip_price_history) > self.lookback_steps:
+            self.chip_price_history.pop(0)
 
 class SMICAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -2094,6 +2237,14 @@ class SMICAgent(CompanyAgent):
         # Manufacture chips and interact with ordering agents
         self.manufacture_chips()
         self.r_and_d()
+        self.calculate_expenses()
+        self.choose_action()
+        self.prev_resources = self.resources.copy()
+        self.update_trend_and_horizon()
+   # Keep the chip price history within the lookback steps
+        if len(self.chip_price_history) > self.lookback_steps:
+            self.chip_price_history.pop(0)
+      
 
 class HuaHongAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -2183,6 +2334,12 @@ class HuaHongAgent(CompanyAgent):
         # Manufacture chips and interact with ordering agents
         self.manufacture_chips()
         self.r_and_d()
+        self.choose_action()
+        self.prev_resources = self.resources.copy()
+        self.update_trend_and_horizon()
+   # Keep the chip price history within the lookback steps
+        if len(self.chip_price_history) > self.lookback_steps:
+            self.chip_price_history.pop(0)
 
 
 
@@ -2274,6 +2431,13 @@ class InfineonAgent(CompanyAgent):
         # Manufacture chips and interact with ordering agents
         self.manufacture_chips()
         self.r_and_d()
+        self.choose_action()
+        self.prev_resources = self.resources.copy()
+        self.update_trend_and_horizon()
+   # Keep the chip price history within the lookback steps
+        if len(self.chip_price_history) > self.lookback_steps:
+            self.chip_price_history.pop(0)
+
 
 
 
@@ -2365,6 +2529,12 @@ class STMicroelectronicsAgent(CompanyAgent):
         # Manufacture chips and interact with ordering agents
         self.manufacture_chips()
         self.r_and_d()
+        self.choose_action()
+        self.prev_resources = self.resources.copy()
+        self.update_trend_and_horizon()
+   # Keep the chip price history within the lookback steps
+        if len(self.chip_price_history) > self.lookback_steps:
+            self.chip_price_history.pop(0)
 
 class RenesasAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -2448,6 +2618,12 @@ class RenesasAgent(CompanyAgent):
         self.buy_resources_from(siltronic_agent, 'wafers', 10)
         self.manufacture_chips()
         self.r_and_d()
+        self.choose_action()
+        self.prev_resources = self.resources.copy()
+        self.update_trend_and_horizon()
+   # Keep the chip price history within the lookback steps
+        if len(self.chip_price_history) > self.lookback_steps:
+            self.chip_price_history.pop(0)
 
 
 class SonyAgent(CompanyAgent):
@@ -2532,6 +2708,12 @@ class SonyAgent(CompanyAgent):
         self.buy_resources_from(siltronic_agent, 'wafers', 10)
         self.manufacture_chips()
         self.r_and_d()
+        self.choose_action()
+        self.prev_resources = self.resources.copy()
+        self.update_trend_and_horizon()
+   # Keep the chip price history within the lookback steps
+        if len(self.chip_price_history) > self.lookback_steps:
+            self.chip_price_history.pop(0)
 
 class TexasInstrumentsAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -2616,4 +2798,10 @@ class TexasInstrumentsAgent(CompanyAgent):
         self.buy_resources_from(siltronic_agent, 'wafers', 10)
         self.manufacture_chips()
         self.r_and_d()
+        self.choose_action()
+        self.prev_resources = self.resources.copy()
+        self.update_trend_and_horizon()
+   # Keep the chip price history within the lookback steps
+        if len(self.chip_price_history) > self.lookback_steps:
+            self.chip_price_history.pop(0)
 

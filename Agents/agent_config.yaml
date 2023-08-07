@@ -1,4 +1,11 @@
 CompanyAgent: 
+  rd_cost_factor: .15
+  production_cost_factor: .25
+  marketing_cost_factor: .10
+  administration_cost_factor: .15
+  logistics_cost_factor: .05
+  infrastructure_cost_factor: .2
+  personnel_cost_factor: .10
   lookback_steps: 5
   talent_range: [1, 10]
   influence: 0.5
@@ -42,7 +49,7 @@ CompanyAgent:
     initial_resources: {'money': 100, 'chips': 100, 'services': 2, 'wafers': 100}
   CustomerAgent:
     talent_range: [5, 10]
-    initial_resources: {'money': 1000, 'chips': 100, 'services': 2, 'wafers': 100}
+    initial_resources: {'money': 10000000000000000000000, 'chips': 100, 'services': 2, 'wafers': 100}
     order_range: [50,100]
   TSMC:
     talent_range: [7, 12]

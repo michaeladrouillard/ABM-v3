@@ -119,38 +119,11 @@ class GameModel(Model):
                             "Total Chips": lambda m: sum(a.resources["chips"] for a in m.schedule.agents if not isinstance(a, PeopleAgent)),
                             "Total Capabilities Growth Rate": lambda m: sum(a.capabilities_score for a in m.schedule.agents if isinstance(a, CompanyAgent)),
                             "GDP": lambda m: {agent.country: agent.calculate_gdp() for agent in m.schedule.agents if isinstance(agent, CountryAgent)}},
-            agent_reporters={"Agent Report": lambda a: a.report() if not isinstance(a, PeopleAgent) else None} )
+            agent_reporters={"Money": lambda a: a.resources["money"] if not isinstance(a, PeopleAgent) else None,
+                             "CompanyName": lambda a: a.company_name if hasattr(a, 'company_name') else None} )
 
-        self.create_network(agent_dict["partnerships"])
         self.print_agents()
 
-    def create_network(self, partnerships):
-    # Create an empty graph
-        G = nx.Graph()
-
-    # Add nodes from your agents
-        for agent in self.schedule.agents:
-            G.add_node(agent)
-
-    # Add edges based on partnerships
-        for partnership in partnerships:
-            company1, company2 = partnership
-         # Find agents corresponding to company1 and company2
-            agent1 = next((agent for agent in self.schedule.agents if isinstance(agent, CompanyAgent) and agent.company_name == company1), None)
-            agent2 = next((agent for agent in self.schedule.agents if isinstance(agent, CompanyAgent) and agent.company_name == company2), None)
-            if agent1 is not None and agent2 is not None:
-                G.add_edge(agent1, agent2)
-
-        self.network = G
-
-    def visualize_network(self):
-        plt.figure(figsize=(10, 10))
-        pos = nx.spring_layout(self.network)  # positions for all nodes
-        nx.draw_networkx_nodes(self.network, pos, node_size=700)
-        nx.draw_networkx_edges(self.network, pos, width=2.0, edge_color='black')
-
-        plt.axis('off')
-        plt.show()
 
     def get_agent_by_id(self, unique_id):
       """Get an agent by its unique_id."""
@@ -159,6 +132,16 @@ class GameModel(Model):
             return agent
       return None  # No agent found
     
+    def print_final_counts(self):
+        total_launch_project = sum(agent.launch_project_count for agent in self.schedule.agents if isinstance(agent, CompanyAgent))
+        total_lobby_government = sum(agent.lobby_government_count for agent in self.schedule.agents if isinstance(agent, CompanyAgent))
+        total_compete_with = sum(agent.compete_with_count for agent in self.schedule.agents if isinstance(agent, CompanyAgent))
+    
+        print(f"Total launch_project actions performed: {total_launch_project}")
+        print(f"Total lobby_government actions performed: {total_lobby_government}")
+        print(f"Total compete_with actions performed: {total_compete_with}")
+
+
     def print_agents(self):
         for agent in self.schedule.agents:
             print(f'Agent ID: {agent.unique_id}, Agent Type: {agent.__class__.__name__}')
