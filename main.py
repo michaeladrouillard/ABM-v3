@@ -27,14 +27,14 @@ def run_model(agent_dict):
     agent_data_reset = agent_data.reset_index()
 
 
-    selected_company_data = agent_data_reset[agent_data_reset['CompanyName'] == 'SMIC']
+    selected_company_data = agent_data_reset[agent_data_reset['CompanyName'] == 'Sumco']
 
     # # Plot the money over time
     plt.figure(figsize=(10,6))
     plt.plot(selected_company_data['Step'], selected_company_data['Money'])
     plt.xlabel('Time Step')
     plt.ylabel('Money')
-    plt.title('SMIC Money')
+    plt.title('Sumco Money')
     plt.grid(True)
     plt.show()
 

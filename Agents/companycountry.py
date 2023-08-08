@@ -63,7 +63,6 @@ class CompanyAgent(Agent):
         self.competition_percentage = self.company_data["competition_percentage"]
         self.history = {"launch_project": [], "lobby_government": [], "cooperate_with_country": [], "cooperate_with_company": [], "compete_with_company": []}
 
-
     def calculate_expenses(self):
         # Use percentages or fixed values from the company_data as cost factors
         rd_cost_factor = self.company_data["rd_cost_factor"]
@@ -773,6 +772,7 @@ class NvidiaAgent(CompanyAgent):
    # Keep the chip price history within the lookback steps
         if len(self.chip_price_history) > self.lookback_steps:
             self.chip_price_history.pop(0)
+        self.calculate_expenses()
 
 
 class IntelAgent(CompanyAgent):
@@ -864,6 +864,7 @@ class IntelAgent(CompanyAgent):
    # Keep the chip price history within the lookback steps
         if len(self.chip_price_history) > self.lookback_steps:
             self.chip_price_history.pop(0)
+        self.calculate_expenses()
 
 
 class TSMCAgent(CompanyAgent):
@@ -1029,6 +1030,7 @@ class AMDAgent(CompanyAgent):
    # Keep the chip price history within the lookback steps
         if len(self.chip_price_history) > self.lookback_steps:
             self.chip_price_history.pop(0)
+        self.calculate_expenses()
 
 class GlobalFoundriesAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -1124,6 +1126,7 @@ class GlobalFoundriesAgent(CompanyAgent):
    # Keep the chip price history within the lookback steps
         if len(self.chip_price_history) > self.lookback_steps:
             self.chip_price_history.pop(0)
+        self.calculate_expenses()
 
 
 
@@ -1151,6 +1154,7 @@ class ASMLAgent(CompanyAgent):
    # Keep the chip price history within the lookback steps
         if len(self.chip_price_history) > self.lookback_steps:
             self.chip_price_history.pop(0)
+        self.calculate_expenses()
 
 
 
@@ -1180,6 +1184,7 @@ class FujimiAgent(CompanyAgent):
    # Keep the chip price history within the lookback steps
         if len(self.chip_price_history) > self.lookback_steps:
             self.chip_price_history.pop(0)
+        self.calculate_expenses()
 
 class SiltronicAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -1211,6 +1216,7 @@ class SiltronicAgent(CompanyAgent):
    # Keep the chip price history within the lookback steps
         if len(self.chip_price_history) > self.lookback_steps:
             self.chip_price_history.pop(0)
+        self.calculate_expenses()
 
 
 
@@ -1240,6 +1246,7 @@ class SumcoAgent(CompanyAgent):
    # Keep the chip price history within the lookback steps
         if len(self.chip_price_history) > self.lookback_steps:
             self.chip_price_history.pop(0)
+        self.calculate_expenses()
 
 
 class SKSiltronAgent(CompanyAgent):
@@ -1276,6 +1283,7 @@ class SKSiltronAgent(CompanyAgent):
    # Keep the chip price history within the lookback steps
         if len(self.chip_price_history) > self.lookback_steps:
             self.chip_price_history.pop(0)
+        self.calculate_expenses()
 
 
 class ShinEtsuAgent(CompanyAgent):
@@ -1300,6 +1308,7 @@ class ShinEtsuAgent(CompanyAgent):
    # Keep the chip price history within the lookback steps
         if len(self.chip_price_history) > self.lookback_steps:
             self.chip_price_history.pop(0)
+        self.calculate_expenses()
 
 
 
@@ -1361,6 +1370,7 @@ class SamsungAgent(CompanyAgent):
     def receive_payment(self, amount):
         # Add the received money to Samsung's resources
         self.resources['money'] += amount
+        self.calculate_expenses()
 
 
 class SamsungSub(SamsungAgent):
@@ -1447,6 +1457,7 @@ class SamsungSub(SamsungAgent):
    # Keep the chip price history within the lookback steps
         if len(self.chip_price_history) > self.lookback_steps:
             self.chip_price_history.pop(0)
+        self.calculate_expenses()
 
 class AmazonAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -1556,6 +1567,7 @@ class AmazonAgent(CompanyAgent):
    # Keep the chip price history within the lookback steps
         if len(self.chip_price_history) > self.lookback_steps:
             self.chip_price_history.pop(0)
+        self.calculate_expenses()
 
 class GoogleAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -1662,6 +1674,7 @@ class GoogleAgent(CompanyAgent):
    # Keep the chip price history within the lookback steps
         if len(self.chip_price_history) > self.lookback_steps:
             self.chip_price_history.pop(0)
+        self.calculate_expenses()
 
 class AppleAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -1770,6 +1783,7 @@ class AppleAgent(CompanyAgent):
    # Keep the chip price history within the lookback steps
         if len(self.chip_price_history) > self.lookback_steps:
             self.chip_price_history.pop(0)
+        self.calculate_expenses()
 
 
 class MetaAgent(CompanyAgent):
@@ -1875,7 +1889,7 @@ class MetaAgent(CompanyAgent):
    # Keep the chip price history within the lookback steps
         if len(self.chip_price_history) > self.lookback_steps:
             self.chip_price_history.pop(0)
-
+        self.calculate_expenses()
 
 
 
@@ -1966,7 +1980,7 @@ class QualcommAgent(CompanyAgent):
    # Keep the chip price history within the lookback steps
         if len(self.chip_price_history) > self.lookback_steps:
             self.chip_price_history.pop(0)
-
+        self.calculate_expenses()
 
 class OpenAIAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -2074,7 +2088,7 @@ class OpenAIAgent(CompanyAgent):
    # Keep the chip price history within the lookback steps
         if len(self.chip_price_history) > self.lookback_steps:
             self.chip_price_history.pop(0)
-
+        self.calculate_expenses()
 
 class MediaTekAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -2148,6 +2162,7 @@ class MediaTekAgent(CompanyAgent):
    # Keep the chip price history within the lookback steps
         if len(self.chip_price_history) > self.lookback_steps:
             self.chip_price_history.pop(0)
+        self.calculate_expenses()
 
 class SMICAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -2244,7 +2259,7 @@ class SMICAgent(CompanyAgent):
    # Keep the chip price history within the lookback steps
         if len(self.chip_price_history) > self.lookback_steps:
             self.chip_price_history.pop(0)
-      
+        self.calculate_expenses()
 
 class HuaHongAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -2340,7 +2355,7 @@ class HuaHongAgent(CompanyAgent):
    # Keep the chip price history within the lookback steps
         if len(self.chip_price_history) > self.lookback_steps:
             self.chip_price_history.pop(0)
-
+        self.calculate_expenses()
 
 
 class InfineonAgent(CompanyAgent):
@@ -2437,7 +2452,7 @@ class InfineonAgent(CompanyAgent):
    # Keep the chip price history within the lookback steps
         if len(self.chip_price_history) > self.lookback_steps:
             self.chip_price_history.pop(0)
-
+        self.calculate_expenses()
 
 
 
@@ -2535,6 +2550,8 @@ class STMicroelectronicsAgent(CompanyAgent):
    # Keep the chip price history within the lookback steps
         if len(self.chip_price_history) > self.lookback_steps:
             self.chip_price_history.pop(0)
+        self.calculate_expenses()
+
 
 class RenesasAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -2624,7 +2641,7 @@ class RenesasAgent(CompanyAgent):
    # Keep the chip price history within the lookback steps
         if len(self.chip_price_history) > self.lookback_steps:
             self.chip_price_history.pop(0)
-
+        self.calculate_expenses()
 
 class SonyAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -2714,6 +2731,7 @@ class SonyAgent(CompanyAgent):
    # Keep the chip price history within the lookback steps
         if len(self.chip_price_history) > self.lookback_steps:
             self.chip_price_history.pop(0)
+        self.calculate_expenses()
 
 class TexasInstrumentsAgent(CompanyAgent):
     def __init__(self, unique_id, model, country_agent, company_name):
@@ -2804,4 +2822,4 @@ class TexasInstrumentsAgent(CompanyAgent):
    # Keep the chip price history within the lookback steps
         if len(self.chip_price_history) > self.lookback_steps:
             self.chip_price_history.pop(0)
-
+        self.calculate_expenses()
