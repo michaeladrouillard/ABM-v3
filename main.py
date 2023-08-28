@@ -27,14 +27,14 @@ def run_model(agent_dict):
     agent_data_reset = agent_data.reset_index()
 
 
-    selected_company_data = agent_data_reset[agent_data_reset['CompanyName'] == 'Sumco']
+    selected_company_data = agent_data_reset[agent_data_reset['CompanyName'] == 'TSMC']
 
     # # Plot the money over time
     plt.figure(figsize=(10,6))
     plt.plot(selected_company_data['Step'], selected_company_data['Money'])
     plt.xlabel('Time Step')
     plt.ylabel('Money')
-    plt.title('Sumco Money')
+    plt.title('TSMC Money')
     plt.grid(True)
     plt.show()
 
@@ -75,10 +75,10 @@ if __name__ == "__main__":
 #             if isinstance(company, CompanyAgent) and company.company_name in selected_companies:
 #                 plt.plot(company.money_history, label=f'{company.company_name}, lookback={value}')
 
-#         plt.xlabel('Time Steps')
-#         plt.ylabel('Money')
-#         plt.legend()
-#         plt.show()
+# plt.xlabel('Time Steps')
+# plt.ylabel('Money')
+# plt.legend()
+# plt.show()
 
 # lookback_steps_values = [5, 10, 15, 20]  # Or whatever values you're interested in
 # run_steps = 100  # Or however many steps you want to run the model for

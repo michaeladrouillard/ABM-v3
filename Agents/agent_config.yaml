@@ -52,7 +52,7 @@ CompanyAgent:
     initial_resources: {'money': 10000000000000000000000, 'chips': 100, 'services': 2, 'wafers': 100}
     order_range: [50,100]
   TSMC:
-    talent_range: [7, 12]
+    talent_range: [0,0]
     initial_resources: {'money': 150, 'chips': 150, 'services': 500, 'wafers': 500}
     # more TSMC-specific configurations here...
   GlobalFoundries:
